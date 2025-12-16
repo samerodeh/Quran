@@ -13,11 +13,64 @@ import {
 } from 'react-native';
 import { Audio } from 'expo-av';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { surahs, getAudioUrl } from './data/surahs';
+import { surahs } from './data/surahs';
+import { reciters, getAudioUrl } from './data/reciters';
+import { getLocalAudio, hasLocalAudio } from './data/localAudio';
 
 const { width } = Dimensions.get('window');
 
-export default function App() {
+// Reciter Selection Screen
+function ReciterSelectScreen({ onSelectReciter }) {
+  const renderReciterItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.reciterCard}
+      onPress={() => onSelectReciter(item)}
+      activeOpacity={0.8}
+    >
+      <View style={styles.reciterImageContainer}>
+        <Text style={styles.reciterEmoji}>🎙️</Text>
+      </View>
+      <View style={styles.reciterInfo}>
+        <Text style={styles.reciterArabicName}>{item.arabicName}</Text>
+        <Text style={styles.reciterEnglishName}>{item.name}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={24} color="#64748B" />
+    </TouchableOpacity>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+      
+      {/* Header */}
+      <View style={styles.reciterHeader}>
+        <View style={styles.reciterHeaderIcon}>
+          <Ionicons name="book" size={48} color="#10B981" />
+        </View>
+        <Text style={styles.reciterHeaderTitle}>القرآن الكريم</Text>
+        <Text style={styles.reciterHeaderSubtitle}>The Holy Quran</Text>
+      </View>
+
+      {/* Choose Reciter Section */}
+      <View style={styles.reciterSection}>
+        <Text style={styles.reciterSectionTitle}>اختر القارئ</Text>
+        <Text style={styles.reciterSectionSubtitle}>Choose a Reciter</Text>
+      </View>
+
+      {/* Reciter List */}
+      <FlatList
+        data={reciters}
+        renderItem={renderReciterItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.reciterList}
+        showsVerticalScrollIndicator={false}
+      />
+    </SafeAreaView>
+  );
+}
+
+// Surah List & Player Screen
+function SurahListScreen({ reciter, onBack }) {
   const [sound, setSound] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -108,12 +161,32 @@ export default function App() {
       setPlaybackPosition(0);
       setPlaybackDuration(0);
 
-      const audioUrl = getAudioUrl(surah.id);
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: audioUrl },
-        { shouldPlay: true },
-        onPlaybackStatusUpdate
-      );
+      let newSound;
+      
+      // Check if this is a local reciter with local audio
+      if (reciter.isLocal && hasLocalAudio(reciter.id, surah.id)) {
+        const localAudio = getLocalAudio(reciter.id, surah.id);
+        const { sound: localSound } = await Audio.Sound.createAsync(
+          localAudio,
+          { shouldPlay: true },
+          onPlaybackStatusUpdate
+        );
+        newSound = localSound;
+      } else if (reciter.isLocal) {
+        // Local reciter but no audio for this surah yet
+        setIsLoading(false);
+        alert(`Recording not available yet for ${surah.name}`);
+        return;
+      } else {
+        // Remote audio from mp3quran.net
+        const audioUrl = getAudioUrl(surah.id, reciter);
+        const { sound: remoteSound } = await Audio.Sound.createAsync(
+          { uri: audioUrl },
+          { shouldPlay: true },
+          onPlaybackStatusUpdate
+        );
+        newSound = remoteSound;
+      }
 
       setSound(newSound);
       setIsLoading(false);
@@ -154,6 +227,14 @@ export default function App() {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const handleBack = async () => {
+    if (sound) {
+      await sound.stopAsync();
+      await sound.unloadAsync();
+    }
+    onBack();
   };
 
   const progressWidth = playbackDuration > 0 
@@ -239,9 +320,12 @@ export default function App() {
       
       {/* Header */}
       <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
+        </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>القرآن الكريم</Text>
-          <Text style={styles.headerSubtitle}>The Holy Quran</Text>
+          <Text style={styles.headerSubtitle}>{reciter.arabicName}</Text>
         </View>
         <View style={styles.headerDecoration}>
           <Ionicons name="book" size={32} color="#10B981" />
@@ -320,39 +404,146 @@ export default function App() {
   );
 }
 
+// Main App Component
+export default function App() {
+  const [selectedReciter, setSelectedReciter] = useState(null);
+
+  if (!selectedReciter) {
+    return <ReciterSelectScreen onSelectReciter={setSelectedReciter} />;
+  }
+
+  return (
+    <SurahListScreen 
+      reciter={selectedReciter} 
+      onBack={() => setSelectedReciter(null)} 
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0F172A',
   },
+  // Reciter Selection Screen Styles
+  reciterHeader: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    backgroundColor: '#1E293B',
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+  },
+  reciterHeaderIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  reciterHeaderTitle: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#F8FAFC',
+    marginBottom: 4,
+  },
+  reciterHeaderSubtitle: {
+    fontSize: 18,
+    color: '#94A3B8',
+  },
+  reciterSection: {
+    paddingHorizontal: 20,
+    paddingTop: 32,
+    paddingBottom: 16,
+  },
+  reciterSectionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#F8FAFC',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  reciterSectionSubtitle: {
+    fontSize: 16,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  reciterList: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  reciterCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  reciterImageContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  reciterEmoji: {
+    fontSize: 32,
+  },
+  reciterInfo: {
+    flex: 1,
+  },
+  reciterArabicName: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#F8FAFC',
+    marginBottom: 4,
+  },
+  reciterEnglishName: {
+    fontSize: 14,
+    color: '#94A3B8',
+  },
+  // Surah List Screen Styles
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     backgroundColor: '#1E293B',
     borderBottomWidth: 1,
     borderBottomColor: '#334155',
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#334155',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   headerContent: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#F8FAFC',
-    textAlign: 'left',
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#94A3B8',
-    marginTop: 4,
+    color: '#10B981',
+    marginTop: 2,
   },
   headerDecoration: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',

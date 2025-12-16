@@ -10,6 +10,14 @@ export const reciters = [
     folderCode: 'samer',
   },
   {
+    id: 'hicham',
+    name: 'Hicham Lharraz (Warsh)',
+    arabicName: 'هشام الهراز - ورش',
+    server: 'server16.mp3quran.net',
+    folderCode: 'H-Lharraz/Rewayat-Warsh-A-n-Nafi',
+    narration: 'Warsh',
+  },
+  {
     id: 'afs',
     name: 'Mishary Rashid Alafasy',
     arabicName: 'مشاري راشد العفاسي',

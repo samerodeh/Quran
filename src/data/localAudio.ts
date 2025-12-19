@@ -18,22 +18,22 @@ const localAudioMap = {
   },
 };
 
-export const getLocalAudio = (reciterId, surahId) => {
-  const reciterAudio = localAudioMap[reciterId];
+export const getLocalAudio = (reciterId: string, surahId: number): any => {
+  const reciterAudio = localAudioMap[reciterId as keyof typeof localAudioMap] as any;
   if (reciterAudio && reciterAudio[surahId]) {
     return reciterAudio[surahId];
   }
   return null;
 };
 
-export const hasLocalAudio = (reciterId, surahId) => {
-  const reciterAudio = localAudioMap[reciterId];
+export const hasLocalAudio = (reciterId: string, surahId: number): boolean => {
+  const reciterAudio = localAudioMap[reciterId as keyof typeof localAudioMap] as any;
   return reciterAudio && reciterAudio[surahId] !== undefined;
 };
 
 // Get list of available surahs for a local reciter
-export const getAvailableSurahs = (reciterId) => {
-  const reciterAudio = localAudioMap[reciterId];
+export const getAvailableSurahs = (reciterId: string): number[] => {
+  const reciterAudio = localAudioMap[reciterId as keyof typeof localAudioMap] as any;
   if (!reciterAudio) return [];
   return Object.keys(reciterAudio).map(Number);
 };

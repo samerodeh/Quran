@@ -1,8 +1,10 @@
 // Qira'at (Quran reading styles) with authentic Mushaf page images
-// Using MP3Quran.net for Hafs (verified, high-quality) 
+// Using MP3Quran.net for Hafs (verified, high-quality)
 // Using Open-Mushaf Native for Warsh (Madina Mushaf - Warsh narration)
 
-export const qiraat = [
+import { Qiraa } from '../types';
+
+export const qiraat: Qiraa[] = [
   {
     id: 'hafs',
     name: 'Hafs',
@@ -10,7 +12,7 @@ export const qiraat = [
     description: 'Madani Mushaf - Most common worldwide',
     arabicDescription: 'مصحف المدينة المنورة',
     // MP3Quran.net - verified high-quality images (1080p resolution available)
-    getImageUrl: (pageNumber) => {
+    getImageUrl: (pageNumber: number): string => {
       const paddedPage = String(pageNumber).padStart(3, '0');
       return `https://www.mp3quran.net/api/quran_pages_arabic/1080/${paddedPage}.png`;
     },
@@ -23,7 +25,7 @@ export const qiraat = [
     description: 'Madina Mushaf - Warsh narration',
     arabicDescription: 'مصحف المدينة - رواية ورش',
     // Open-Mushaf Native - Warsh with blue/azrak styling
-    getImageUrl: (pageNumber) => {
+    getImageUrl: (pageNumber: number): string => {
       return `https://raw.githubusercontent.com/adelpro/open-mushaf-native/main/assets/mushaf-data/mushaf-elmadina-warsh-azrak/${pageNumber}.png`;
     },
     totalPages: 604,
@@ -34,8 +36,9 @@ export const qiraat = [
 export const TOTAL_PAGES = 604;
 
 // Get mushaf page image URL
-export const getMushafPageUrl = (pageNumber, qiraaId = 'hafs') => {
+export const getMushafPageUrl = (pageNumber: number, qiraaId: string = 'hafs'): string => {
   const qiraa = qiraat.find(q => q.id === qiraaId) || qiraat[0];
+  if (!qiraa || !qiraa.getImageUrl) return '';
   return qiraa.getImageUrl(pageNumber);
 };
 

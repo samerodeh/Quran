@@ -1,7 +1,9 @@
 // Complete list of all 114 Surahs of the Quran
 // Audio source: https://server8.mp3quran.net/afs/ (Sheikh Mishary Rashid Alafasy)
 
-export const surahs = [
+import { Surah } from '../types';
+
+export const surahs: Surah[] = [
   { id: 1, name: "Al-Fatihah", arabicName: "الفاتحة", englishName: "The Opening", verses: 7, revelationType: "Meccan" },
   { id: 2, name: "Al-Baqarah", arabicName: "البقرة", englishName: "The Cow", verses: 286, revelationType: "Medinan" },
   { id: 3, name: "Aal-Imran", arabicName: "آل عمران", englishName: "The Family of Imran", verses: 200, revelationType: "Medinan" },
@@ -120,7 +122,7 @@ export const surahs = [
 
 // Helper function to get audio URL for a surah
 // Using Mishary Rashid Alafasy's recitation from MP3Quran
-export const getAudioUrl = (surahId) => {
+export const getAudioUrl = (surahId: number): string => {
   const paddedId = String(surahId).padStart(3, '0');
   return `https://server8.mp3quran.net/afs/${paddedId}.mp3`;
 };

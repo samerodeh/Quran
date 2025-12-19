@@ -54,6 +54,8 @@ export interface AudioPlayerState {
   showSpeedPicker: boolean;
   setShowSpeedPicker: (show: boolean) => void;
   showMiniPlayer: boolean;
+  isPlayerExpanded: boolean;
+  setIsPlayerExpanded: (expanded: boolean) => void;
   isSeekingRef: React.RefObject<boolean>;
   seekPositionRef: React.RefObject<number>;
   progressBarWidth: React.RefObject<number>;

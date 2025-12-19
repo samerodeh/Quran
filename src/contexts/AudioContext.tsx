@@ -3,10 +3,12 @@ import { Audio } from 'expo-av';
 import { AudioPlayerState, Surah, Reciter, PLAYBACK_SPEEDS } from '../types';
 import { getAudioUrl } from '../data/reciters';
 import { getLocalAudio, hasLocalAudio } from '../data/localAudio';
+import { useDownload } from './DownloadContext';
 
 const AudioContext = createContext<AudioPlayerState | null>(null);
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
+  const { isDownloaded, getLocalAudioUri } = useDownload();
   const [sound, setSound] = useState<any>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -19,6 +21,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [showSpeedPicker, setShowSpeedPicker] = useState(false);
   const [showMiniPlayer, setShowMiniPlayer] = useState(false);
+  const [isPlayerExpanded, setIsPlayerExpanded] = useState(false);
 
   const isSeekingRef = useRef(false);
   const seekPositionRef = useRef(0);
@@ -77,9 +80,11 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       setPlaybackPosition(0);
       setPlaybackDuration(0);
       setShowMiniPlayer(true);
+      setIsPlayerExpanded(false); // Start collapsed by default
 
       let newSound;
       if (reciter?.isLocal && hasLocalAudio(reciter.id, surah.id)) {
+        // Local bundled audio (from assets)
         const localAudio = getLocalAudio(reciter.id, surah.id);
         const { sound: localSound } = await Audio.Sound.createAsync(
           localAudio,
@@ -91,7 +96,28 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
         alert(`Recording not available yet for ${surah.name}`);
         return;
+      } else if (isDownloaded(reciter.id, surah.id)) {
+        // Downloaded audio (from file system)
+        const downloadedUri = getLocalAudioUri(reciter.id, surah.id);
+        if (downloadedUri) {
+          const { sound: downloadedSound } = await Audio.Sound.createAsync(
+            { uri: downloadedUri },
+            { shouldPlay: true },
+            onPlaybackStatusUpdate
+          );
+          newSound = downloadedSound;
+        } else {
+          // Fallback to streaming if download path not found
+          const audioUrl = getAudioUrl(surah.id, reciter);
+          const { sound: remoteSound } = await Audio.Sound.createAsync(
+            { uri: audioUrl },
+            { shouldPlay: true },
+            onPlaybackStatusUpdate
+          );
+          newSound = remoteSound;
+        }
       } else {
+        // Stream from remote URL
         const audioUrl = getAudioUrl(surah.id, reciter);
         const { sound: remoteSound } = await Audio.Sound.createAsync(
           { uri: audioUrl },
@@ -176,6 +202,8 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     showSpeedPicker,
     setShowSpeedPicker,
     showMiniPlayer,
+    isPlayerExpanded,
+    setIsPlayerExpanded,
     isSeekingRef,
     seekPositionRef,
     progressBarWidth,

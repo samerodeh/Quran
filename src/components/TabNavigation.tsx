@@ -40,14 +40,16 @@ export function TabNavigation({ activeTab, setActiveTab }: TabNavigationProps) {
   );
 }
 
+const TAB_BAR_HEIGHT = 80;
+
 const styles = StyleSheet.create({
   bottomNav: {
     flexDirection: 'row',
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
-    paddingBottom: 20,
-    paddingTop: 10,
+    height: TAB_BAR_HEIGHT,
+    paddingTop: 8,
   },
   navTab: {
     flex: 1,

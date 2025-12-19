@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, StatusBar, StyleSheet } from 'react-native';
 import { AudioProvider, useAudio } from './contexts/AudioContext';
+import { DownloadProvider } from './contexts/DownloadContext';
 import { TabNavigation } from './components/TabNavigation';
 import { GlobalAudioPlayer } from './components/GlobalAudioPlayer';
 import { ReadSection } from './screens/ReadSection';
@@ -34,9 +35,11 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AudioProvider>
-      <AppContent />
-    </AudioProvider>
+    <DownloadProvider>
+      <AudioProvider>
+        <AppContent />
+      </AudioProvider>
+    </DownloadProvider>
   );
 }
 

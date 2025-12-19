@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { View, TouchableOpacity, Text, ActivityIndicator, Modal, StyleSheet, PanResponder } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, TouchableOpacity, Text, ActivityIndicator, Modal, StyleSheet, Platform, GestureResponderEvent } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAudio } from '../contexts/AudioContext';
 import { PLAYBACK_SPEEDS, COLORS } from '../types';
@@ -21,6 +21,8 @@ export function GlobalAudioPlayer() {
     showSpeedPicker,
     setShowSpeedPicker,
     showMiniPlayer,
+    isPlayerExpanded,
+    setIsPlayerExpanded,
     isSeekingRef,
     seekPositionRef,
     progressBarWidth,
@@ -32,64 +34,71 @@ export function GlobalAudioPlayer() {
     stopPlayback,
   } = useAudio();
 
-  const dragStartX = useRef(0);
-  const dragStartPosition = useRef(0);
+  const progressBarRef = useRef<View>(null);
+  const [barLayout, setBarLayout] = useState({ x: 0, width: 0 });
 
   const handleProgressBarLayout = (event: any) => {
-    progressBarWidth.current = event.nativeEvent.layout.width;
+    const { width } = event.nativeEvent.layout;
+    progressBarWidth.current = width;
+    
+    // Get absolute position for web
+    if (progressBarRef.current && Platform.OS === 'web') {
+      (progressBarRef.current as any).measure?.((x: number, y: number, w: number, h: number, pageX: number, pageY: number) => {
+        setBarLayout({ x: pageX, width: w });
+      });
+    }
   };
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt: any) => {
-        const duration = playbackDurationRef.current;
-        const barWidth = progressBarWidth.current;
-        if (!duration || !barWidth) return;
+  const calculatePositionFromTouch = (pageX: number): number => {
+    const duration = playbackDurationRef.current;
+    const barWidth = progressBarWidth.current;
+    if (!duration || !barWidth) return 0;
 
-        isSeekingRef.current = true;
-        setIsSeeking(true);
+    let relativeX: number;
+    if (Platform.OS === 'web' && barLayout.width > 0) {
+      relativeX = pageX - barLayout.x;
+    } else {
+      relativeX = pageX - 20; // Approximate padding
+    }
 
-        dragStartX.current = evt.nativeEvent.pageX;
-        const touchX = evt.nativeEvent.locationX;
-        const percentage = Math.max(0, Math.min(1, touchX / barWidth));
-        const initialPosition = percentage * duration;
-        dragStartPosition.current = initialPosition;
-        seekPositionRef.current = initialPosition;
-        setSeekPosition(initialPosition);
-      },
-      onPanResponderMove: (evt: any) => {
-        const duration = playbackDurationRef.current;
-        const barWidth = progressBarWidth.current;
-        if (!duration || !barWidth || !isSeekingRef.current) return;
+    const percentage = Math.max(0, Math.min(1, relativeX / barWidth));
+    return percentage * duration;
+  };
 
-        const deltaX = evt.nativeEvent.pageX - dragStartX.current;
-        const deltaTime = (deltaX / barWidth) * duration;
-        const newPosition = Math.max(0, Math.min(duration, dragStartPosition.current + deltaTime));
-        seekPositionRef.current = newPosition;
-        setSeekPosition(newPosition);
-      },
-      onPanResponderRelease: async () => {
-        const currentSound = soundRef.current;
-        const position = seekPositionRef.current;
+  const handleTouchStart = (evt: GestureResponderEvent) => {
+    const duration = playbackDurationRef.current;
+    if (!duration) return;
 
-        if (currentSound && position >= 0) {
-          try {
-            await currentSound.setPositionAsync(Math.floor(position));
-          } catch (error) {
-            console.error('Error seeking:', error);
-          }
-        }
-        isSeekingRef.current = false;
-        setIsSeeking(false);
-      },
-      onPanResponderTerminate: () => {
-        isSeekingRef.current = false;
-        setIsSeeking(false);
-      },
-    })
-  ).current;
+    isSeekingRef.current = true;
+    setIsSeeking(true);
+
+    const position = calculatePositionFromTouch(evt.nativeEvent.pageX);
+    seekPositionRef.current = position;
+    setSeekPosition(position);
+  };
+
+  const handleTouchMove = (evt: GestureResponderEvent) => {
+    if (!isSeekingRef.current) return;
+
+    const position = calculatePositionFromTouch(evt.nativeEvent.pageX);
+    seekPositionRef.current = position;
+    setSeekPosition(position);
+  };
+
+  const handleTouchEnd = async () => {
+    const currentSound = soundRef.current;
+    const position = seekPositionRef.current;
+
+    if (currentSound && position >= 0) {
+      try {
+        await currentSound.setPositionAsync(Math.floor(position));
+      } catch (error) {
+        console.error('Error seeking:', error);
+      }
+    }
+    isSeekingRef.current = false;
+    setIsSeeking(false);
+  };
 
   const formatTime = (millis: number) => {
     if (!millis) return '0:00';
@@ -104,14 +113,72 @@ export function GlobalAudioPlayer() {
   const displayPosition = isSeeking ? seekPosition : playbackPosition;
   const progressWidth = playbackDuration > 0 ? (displayPosition / playbackDuration) * 100 : 0;
 
+  // Minimized player view
+  if (!isPlayerExpanded) {
+    return (
+      <TouchableOpacity
+        style={styles.minimizedPlayerContainer}
+        onPress={() => setIsPlayerExpanded(true)}
+        activeOpacity={0.9}
+      >
+        <View style={styles.minimizedPlayerContent}>
+          <TouchableOpacity
+            style={styles.minimizedPlayButton}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              togglePlayPause();
+            }}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color={COLORS.text} />
+            ) : (
+              <Ionicons name={isPlaying ? 'pause' : 'play'} size={20} color={COLORS.text} />
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.minimizedInfo}>
+            <Text style={styles.minimizedArabicName} numberOfLines={1}>
+              {currentSurah.arabicName}
+            </Text>
+            <Text style={styles.minimizedSurahName} numberOfLines={1}>
+              {currentSurah.name}
+            </Text>
+          </View>
+
+          <View style={styles.minimizedProgress}>
+            <View style={[styles.minimizedProgressBar, { width: `${progressWidth}%` }]} />
+          </View>
+
+          <TouchableOpacity
+            style={styles.expandButton}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              setIsPlayerExpanded(true);
+            }}
+          >
+            <Ionicons name="chevron-up" size={20} color={COLORS.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  // Expanded player view
   return (
     <>
       <View style={styles.globalPlayerContainer}>
         <View style={styles.progressContainer}>
           <View
+            ref={progressBarRef}
             style={styles.progressBarTouchArea}
             onLayout={handleProgressBarLayout}
-            {...panResponder.panHandlers}
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={handleTouchStart}
+            onResponderMove={handleTouchMove}
+            onResponderRelease={handleTouchEnd}
+            onResponderTerminate={handleTouchEnd}
           >
             <View style={styles.progressBar}>
               <View style={[styles.progressFill, { width: `${progressWidth}%` }]} />
@@ -155,6 +222,13 @@ export function GlobalAudioPlayer() {
             <Text style={styles.speedButtonText}>{playbackSpeed}x</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.collapseButton}
+            onPress={() => setIsPlayerExpanded(false)}
+          >
+            <Ionicons name="chevron-down" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.closePlayerButton} onPress={stopPlayback}>
             <Ionicons name="close" size={18} color="#94A3B8" />
           </TouchableOpacity>
@@ -195,17 +269,77 @@ export function GlobalAudioPlayer() {
   );
 }
 
+const TAB_BAR_HEIGHT = 80;
+
 const styles = StyleSheet.create({
+  minimizedPlayerContainer: {
+    position: 'absolute',
+    bottom: TAB_BAR_HEIGHT,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 8,
+    zIndex: 100,
+  },
+  minimizedPlayerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  minimizedPlayButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  minimizedInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  minimizedArabicName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  minimizedSurahName: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+  },
+  minimizedProgress: {
+    height: 3,
+    width: 60,
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  minimizedProgressBar: {
+    height: '100%',
+    backgroundColor: COLORS.primary,
+  },
+  expandButton: {
+    padding: 8,
+  },
   globalPlayerContainer: {
     position: 'absolute',
-    bottom: 70,
+    bottom: TAB_BAR_HEIGHT,
     left: 0,
     right: 0,
     backgroundColor: COLORS.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingTop: 14,
-    paddingBottom: 20,
+    paddingTop: 16,
+    paddingBottom: 16,
     paddingHorizontal: 20,
     borderTopWidth: 1,
     borderColor: COLORS.border,
@@ -214,16 +348,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 10,
+    zIndex: 100,
   },
   progressContainer: {
     marginBottom: 10,
   },
   progressBarTouchArea: {
-    height: 30,
+    height: 36,
     justifyContent: 'center',
     marginHorizontal: -10,
     paddingHorizontal: 10,
-  },
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+  } as any,
   progressBar: {
     height: 4,
     backgroundColor: COLORS.surfaceLight,
@@ -275,43 +411,43 @@ const styles = StyleSheet.create({
   },
   nowPlayingInfo: {
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   nowPlayingArabic: {
-    fontSize: 20,
+    fontSize: 18,
     color: COLORS.text,
     fontWeight: '600',
     marginBottom: 2,
   },
   nowPlayingName: {
-    fontSize: 13,
+    fontSize: 12,
     color: COLORS.textSecondary,
   },
   controls: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 20,
+    gap: 16,
   },
   skipButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.surfaceLight,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
     gap: 4,
   },
   skipButtonText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
     color: '#E2E8F0',
   },
   playPauseButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -325,29 +461,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 12,
-    gap: 16,
+    marginTop: 10,
+    gap: 12,
   },
   speedButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.surfaceLight,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
     gap: 4,
   },
   speedButtonText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: COLORS.textSecondary,
   },
+  collapseButton: {
+    backgroundColor: COLORS.surfaceLight,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
   closePlayerButton: {
     backgroundColor: COLORS.surfaceLight,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
   },
   speedModalOverlay: {
     flex: 1,

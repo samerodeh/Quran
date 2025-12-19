@@ -15,7 +15,7 @@ export function TabNavigation({ activeTab, setActiveTab }: TabNavigationProps) {
         style={[styles.navTab, activeTab === 'read' && styles.navTabActive]}
         onPress={() => setActiveTab('read')}
       >
-        <Ionicons name="book" size={24} color={activeTab === 'read' ? COLORS.primary : COLORS.textSecondary} />
+        <Ionicons name="book" size={22} color={activeTab === 'read' ? COLORS.primary : COLORS.textSecondary} />
         <Text style={[styles.navTabText, activeTab === 'read' && styles.navTabTextActive]}>
           Read
         </Text>
@@ -28,12 +28,25 @@ export function TabNavigation({ activeTab, setActiveTab }: TabNavigationProps) {
         style={[styles.navTab, activeTab === 'listen' && styles.navTabActive]}
         onPress={() => setActiveTab('listen')}
       >
-        <Ionicons name="headset" size={24} color={activeTab === 'listen' ? COLORS.primary : COLORS.textSecondary} />
+        <Ionicons name="headset" size={22} color={activeTab === 'listen' ? COLORS.primary : COLORS.textSecondary} />
         <Text style={[styles.navTabText, activeTab === 'listen' && styles.navTabTextActive]}>
           Listen
         </Text>
         <Text style={[styles.navTabArabic, activeTab === 'listen' && styles.navTabTextActive]}>
           استماع
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.navTab, activeTab === 'athan' && styles.navTabActive]}
+        onPress={() => setActiveTab('athan')}
+      >
+        <Ionicons name="volume-high" size={22} color={activeTab === 'athan' ? COLORS.primary : COLORS.textSecondary} />
+        <Text style={[styles.navTabText, activeTab === 'athan' && styles.navTabTextActive]}>
+          Athan
+        </Text>
+        <Text style={[styles.navTabArabic, activeTab === 'athan' && styles.navTabTextActive]}>
+          الأذان
         </Text>
       </TouchableOpacity>
     </View>

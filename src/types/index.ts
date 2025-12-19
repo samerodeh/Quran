@@ -70,8 +70,8 @@ export interface AudioPlayerState {
 }
 
 export interface TabNavigationProps {
-  activeTab: 'read' | 'listen';
-  setActiveTab: (tab: 'read' | 'listen') => void;
+  activeTab: 'read' | 'listen' | 'athan';
+  setActiveTab: (tab: 'read' | 'listen' | 'athan') => void;
 }
 
 export interface ScreenProps {
@@ -168,7 +168,37 @@ export const COLORS = {
   medinan: 'rgba(59, 130, 246, 0.15)',
 } as const;
 
+// Athan types
+export interface Muezzin {
+  id: string;
+  name: string;
+  arabicName: string;
+  location: string;
+  audioUrl: string;
+  duration: string;
+}
+
+export interface PrayerTimes {
+  fajr: string;
+  sunrise: string;
+  dhuhr: string;
+  asr: string;
+  maghrib: string;
+  isha: string;
+}
+
+export interface AthanSettings {
+  enabled: boolean;
+  selectedMuezzin: Muezzin | null;
+  fajrEnabled: boolean;
+  dhuhrEnabled: boolean;
+  asrEnabled: boolean;
+  maghribEnabled: boolean;
+  ishaEnabled: boolean;
+}
+
 // Utility types
 export type PlaybackSpeed = typeof PLAYBACK_SPEEDS[number];
-export type TabType = 'read' | 'listen';
+export type TabType = 'read' | 'listen' | 'athan';
 export type NarrationType = 'hafs' | 'warsh';
+export type PrayerName = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';

@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { View, StatusBar, StyleSheet } from 'react-native';
 import { AudioProvider, useAudio } from './contexts/AudioContext';
 import { DownloadProvider } from './contexts/DownloadContext';
+import { AthanProvider } from './contexts/AthanContext';
 import { TabNavigation } from './components/TabNavigation';
 import { GlobalAudioPlayer } from './components/GlobalAudioPlayer';
 import { ReadSection } from './screens/ReadSection';
 import { ListenSection } from './screens/ListenSection';
+import { AthanSection } from './screens/AthanSection';
 import { TabType, COLORS } from './types';
 
 function AppContent() {
@@ -16,12 +18,15 @@ function AppContent() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.secondary} />
 
-      {/* Keep both sections mounted but only show the active one */}
+      {/* Keep all sections mounted but only show the active one */}
       <View style={[styles.tabContent, activeTab !== 'listen' && styles.hiddenTab]}>
         <ListenSection />
       </View>
       <View style={[styles.tabContent, activeTab !== 'read' && styles.hiddenTab]}>
         <ReadSection />
+      </View>
+      <View style={[styles.tabContent, activeTab !== 'athan' && styles.hiddenTab]}>
+        <AthanSection />
       </View>
 
       {/* Global Audio Player - shows on all tabs */}
@@ -36,9 +41,11 @@ function AppContent() {
 export default function App() {
   return (
     <DownloadProvider>
-      <AudioProvider>
-        <AppContent />
-      </AudioProvider>
+      <AthanProvider>
+        <AudioProvider>
+          <AppContent />
+        </AudioProvider>
+      </AthanProvider>
     </DownloadProvider>
   );
 }

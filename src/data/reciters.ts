@@ -7,14 +7,6 @@ import { Reciter } from '../types';
 // Hafs reciters (most common narration)
 export const hafsReciters: Reciter[] = [
   {
-    id: 'samer',
-    name: 'Samer Odeh',
-    arabicName: 'سامر عودة',
-    isLocal: true,
-    folderCode: 'samer',
-    narration: 'Hafs',
-  },
-  {
     id: 'afs',
     name: 'Mishary Rashid Alafasy',
     arabicName: 'مشاري راشد العفاسي',

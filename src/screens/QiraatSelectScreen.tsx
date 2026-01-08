@@ -2,6 +2,8 @@ import React from 'react';
 import { FlatList, TouchableOpacity, Text, SafeAreaView, View, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { QiraatSelectScreenProps, Qiraa, COLORS } from '../types';
+
+
 import { qiraat } from '../data/qiraat';
 
 export function QiraatSelectScreen({ onSelectQiraa }: QiraatSelectScreenProps) {

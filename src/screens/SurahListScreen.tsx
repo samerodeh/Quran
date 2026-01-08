@@ -2,6 +2,8 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { FlatList, TouchableOpacity, Text, SafeAreaView, View, StyleSheet, TextInput, ActivityIndicator, Alert } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SurahListScreenProps, Surah, COLORS } from '../types';
+
+
 import { surahs } from '../data/surahs';
 import { useAudio } from '../contexts/AudioContext';
 import { useDownload } from '../contexts/DownloadContext';

@@ -2,6 +2,8 @@ import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { View, TouchableOpacity, Text, SafeAreaView, Image, FlatList, Modal, StyleSheet, Dimensions, TextInput } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { MushafScreenProps, COLORS, TOTAL_PAGES, Surah } from '../types';
+
+
 import { getLocalMushafImage } from '../data/mushafImages';
 import { JUZ_PAGES, SURAH_PAGES } from '../data/qiraat';
 import { surahs } from '../data/surahs';

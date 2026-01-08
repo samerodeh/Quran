@@ -1,14 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
-import { AudioPlayerState, Surah, Reciter, PLAYBACK_SPEEDS } from '../types';
+import { Platform } from 'react-native';
+import { AudioPlayerState, Surah, Reciter, PLAYBACK_SPEEDS, RepeatMode } from '../types';
 import { getAudioUrl } from '../data/reciters';
 import { getLocalAudio, hasLocalAudio } from '../data/localAudio';
 import { useDownload } from './DownloadContext';
+import { useSettings } from './SettingsContext';
+import { surahs } from '../data/surahs';
 
 const AudioContext = createContext<AudioPlayerState | null>(null);
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
   const { isDownloaded, getLocalAudioUri } = useDownload();
+  const { settings } = useSettings();
   const [sound, setSound] = useState<any>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,12 +26,26 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [showSpeedPicker, setShowSpeedPicker] = useState(false);
   const [showMiniPlayer, setShowMiniPlayer] = useState(false);
   const [isPlayerExpanded, setIsPlayerExpanded] = useState(false);
+  // Repeat functionality
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
+  const [repeatStartTime, setRepeatStartTime] = useState<number | null>(null);
+  const [repeatEndTime, setRepeatEndTime] = useState<number | null>(null);
+  const [repeatCount, setRepeatCount] = useState(1);
+  const [repeatCountRemaining, setRepeatCountRemaining] = useState(1);
+  const [showRepeatModal, setShowRepeatModal] = useState(false);
 
   const isSeekingRef = useRef(false);
   const seekPositionRef = useRef(0);
   const progressBarWidth = useRef(0);
   const playbackDurationRef = useRef(0);
   const soundRef = useRef<any>(null);
+  const currentSurahRef = useRef<Surah | null>(null);
+  const currentReciterRef = useRef<Reciter | null>(null);
+  const playSurahRef = useRef<((surah: Surah, reciter: Reciter) => Promise<void>) | null>(null);
+  const repeatStartTimeRef = useRef<number | null>(null);
+  const repeatEndTimeRef = useRef<number | null>(null);
+  const repeatModeRef = useRef<RepeatMode>('off');
+  const repeatCountRemainingRef = useRef(1);
 
   useEffect(() => {
     Audio.setAudioModeAsync({
@@ -45,7 +63,60 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     return sound ? () => { sound.unloadAsync(); } : undefined;
   }, [sound]);
 
-  const onPlaybackStatusUpdate = useCallback((status: any) => {
+  // Update Media Session API for web (lock screen controls)
+  const updateMediaSession = useCallback((surah: Surah | null, reciter: Reciter | null) => {
+    if (Platform.OS === 'web' && 'mediaSession' in navigator) {
+      const mediaSession = (navigator as any).mediaSession;
+      if (surah && reciter) {
+        try {
+          mediaSession.metadata = new (window as any).MediaMetadata({
+            title: `${surah.arabicName} - ${surah.name}`,
+            artist: reciter.arabicName || reciter.name,
+            album: 'القرآن الكريم',
+          });
+
+          // Set up action handlers
+          mediaSession.setActionHandler('play', async () => {
+            if (soundRef.current) {
+              await soundRef.current.playAsync();
+            }
+          });
+
+          mediaSession.setActionHandler('pause', async () => {
+            if (soundRef.current) {
+              await soundRef.current.pauseAsync();
+            }
+          });
+
+          mediaSession.setActionHandler('previoustrack', async () => {
+            const currentSurah = currentSurahRef.current;
+            const currentReciter = currentReciterRef.current;
+            if (currentSurah && currentReciter) {
+              const previousSurah = surahs.find(s => s.id === currentSurah.id - 1);
+              if (previousSurah && playSurahRef.current) {
+                await playSurahRef.current(previousSurah, currentReciter);
+              }
+            }
+          });
+
+          mediaSession.setActionHandler('nexttrack', async () => {
+            const currentSurah = currentSurahRef.current;
+            const currentReciter = currentReciterRef.current;
+            if (currentSurah && currentReciter) {
+              const nextSurah = surahs.find(s => s.id === currentSurah.id + 1);
+              if (nextSurah && playSurahRef.current) {
+                await playSurahRef.current(nextSurah, currentReciter);
+              }
+            }
+          });
+        } catch (error) {
+          console.error('Error setting up Media Session:', error);
+        }
+      }
+    }
+  }, []);
+
+  const onPlaybackStatusUpdate = useCallback(async (status: any) => {
     if (status.isLoaded) {
       if (!isSeekingRef.current) {
         setPlaybackPosition(status.positionMillis);
@@ -53,12 +124,69 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       setPlaybackDuration(status.durationMillis || 0);
       playbackDurationRef.current = status.durationMillis || 0;
       setIsPlaying(status.isPlaying);
+
+      // Handle repeat logic
+      const currentPos = status.positionMillis;
+      const endTime = repeatEndTimeRef.current;
+      const startTime = repeatStartTimeRef.current;
+      const mode = repeatModeRef.current;
+      const remaining = repeatCountRemainingRef.current;
+
+      if (mode !== 'off' && endTime !== null && startTime !== null && currentPos >= endTime) {
+        // Reached end of repeat range
+        if (mode === 'infinite') {
+          // Infinite repeat - jump back to start
+          if (soundRef.current) {
+            await soundRef.current.setPositionAsync(startTime);
+          }
+        } else if (mode === 'count' && remaining > 0) {
+          // Count mode - decrement and repeat if remaining > 0
+          const newRemaining = remaining - 1;
+          repeatCountRemainingRef.current = newRemaining;
+          setRepeatCountRemaining(newRemaining);
+          if (newRemaining > 0) {
+            // Still have repeats left - jump back to start
+            if (soundRef.current) {
+              await soundRef.current.setPositionAsync(startTime);
+            }
+          } else {
+            // No more repeats - continue normal playback
+            setRepeatMode('off');
+            repeatModeRef.current = 'off';
+          }
+        }
+      }
+
       if (status.didJustFinish) {
         setIsPlaying(false);
         setPlaybackPosition(0);
+        // Only auto-play next surah if repeat is off and auto-play is enabled
+        if (repeatModeRef.current === 'off' && settings.autoPlayNext) {
+          const surah = currentSurahRef.current;
+          const reciter = currentReciterRef.current;
+          if (surah && reciter && playSurahRef.current) {
+            let nextSurah: Surah | undefined;
+            
+            if (settings.shufflePlay) {
+              // Shuffle mode: play a random surah (excluding current one)
+              const availableSurahs = surahs.filter(s => s.id !== surah.id);
+              if (availableSurahs.length > 0) {
+                const randomIndex = Math.floor(Math.random() * availableSurahs.length);
+                nextSurah = availableSurahs[randomIndex];
+              }
+            } else {
+              // Sequential mode: play next surah
+              nextSurah = surahs.find(s => s.id === surah.id + 1);
+            }
+            
+            if (nextSurah) {
+              playSurahRef.current(nextSurah, reciter);
+            }
+          }
+        }
       }
     }
-  }, []);
+  }, [settings]);
 
   const playSurah = async (surah: Surah, reciter: Reciter) => {
     try {
@@ -77,10 +205,14 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       setCurrentSurah(surah);
       setCurrentReciter(reciter);
+      currentSurahRef.current = surah;
+      currentReciterRef.current = reciter;
       setPlaybackPosition(0);
       setPlaybackDuration(0);
       setShowMiniPlayer(true);
       setIsPlayerExpanded(false); // Start collapsed by default
+      // Clear repeat when switching surahs
+      clearRepeat();
 
       let newSound;
       if (reciter?.isLocal && hasLocalAudio(reciter.id, surah.id)) {
@@ -134,6 +266,9 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         await newSound.setRateAsync(playbackSpeed, true);
       }
 
+      // Update Media Session for web
+      updateMediaSession(surah, reciter);
+
       setIsLoading(false);
     } catch (error) {
       console.error('Error playing audio:', error);
@@ -180,10 +315,71 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     setSound(null);
     setCurrentSurah(null);
     setCurrentReciter(null);
+    currentSurahRef.current = null;
+    currentReciterRef.current = null;
     setShowMiniPlayer(false);
     setPlaybackPosition(0);
     setPlaybackDuration(0);
+    // Clear Media Session
+    if (Platform.OS === 'web' && 'mediaSession' in navigator) {
+      (navigator as any).mediaSession.metadata = null;
+    }
   };
+
+  const playNextSurah = async () => {
+    const surah = currentSurahRef.current;
+    const reciter = currentReciterRef.current;
+    if (!surah || !reciter) return;
+    const nextSurah = surahs.find(s => s.id === surah.id + 1);
+    if (nextSurah && playSurahRef.current) {
+      await playSurahRef.current(nextSurah, reciter);
+    }
+  };
+
+  const playPreviousSurah = async () => {
+    const surah = currentSurahRef.current;
+    const reciter = currentReciterRef.current;
+    if (!surah || !reciter) return;
+    const previousSurah = surahs.find(s => s.id === surah.id - 1);
+    if (previousSurah && playSurahRef.current) {
+      await playSurahRef.current(previousSurah, reciter);
+    }
+  };
+
+  const setRepeatRange = useCallback((startTime: number, endTime: number) => {
+    setRepeatStartTime(startTime);
+    setRepeatEndTime(endTime);
+    repeatStartTimeRef.current = startTime;
+    repeatEndTimeRef.current = endTime;
+  }, []);
+
+  const setRepeatModeHandler = useCallback((mode: RepeatMode, count: number = 1) => {
+    setRepeatMode(mode);
+    repeatModeRef.current = mode;
+    if (mode === 'count') {
+      setRepeatCount(count);
+      setRepeatCountRemaining(count);
+      repeatCountRemainingRef.current = count;
+    } else if (mode === 'off') {
+      setRepeatCountRemaining(0);
+      repeatCountRemainingRef.current = 0;
+    }
+  }, []);
+
+  const clearRepeat = useCallback(() => {
+    setRepeatMode('off');
+    setRepeatStartTime(null);
+    setRepeatEndTime(null);
+    setRepeatCount(1);
+    setRepeatCountRemaining(1);
+    repeatModeRef.current = 'off';
+    repeatStartTimeRef.current = null;
+    repeatEndTimeRef.current = null;
+    repeatCountRemainingRef.current = 1;
+  }, []);
+
+  // Store playSurah in ref so it can be called from callbacks
+  playSurahRef.current = playSurah;
 
   const value: AudioPlayerState = {
     sound,
@@ -214,8 +410,20 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     skipForward,
     skipBackward,
     changePlaybackSpeed,
-    stopPlayback,
-  };
+      stopPlayback,
+      playNextSurah,
+      playPreviousSurah,
+      repeatMode,
+      repeatStartTime,
+      repeatEndTime,
+      repeatCount,
+      repeatCountRemaining,
+      showRepeatModal,
+      setShowRepeatModal,
+      setRepeatRange,
+      setRepeatMode: setRepeatModeHandler,
+      clearRepeat,
+    };
 
   return (
     <AudioContext.Provider value={value}>

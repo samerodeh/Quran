@@ -70,3 +70,4 @@ export const athans: Muezzin[] = [
 
 export default athans;
 
+

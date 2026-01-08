@@ -1,8 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { View, TouchableOpacity, Text, ActivityIndicator, Modal, StyleSheet, Platform, GestureResponderEvent } from 'react-native';
+import { View, TouchableOpacity, Text, ActivityIndicator, Modal, StyleSheet, Platform, GestureResponderEvent, TextInput } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAudio } from '../contexts/AudioContext';
-import { PLAYBACK_SPEEDS, COLORS } from '../types';
+import { useSettings } from '../contexts/SettingsContext';
+import { PLAYBACK_SPEEDS, COLORS, RepeatMode } from '../types';
+import { surahs } from '../data/surahs';
 
 export function GlobalAudioPlayer() {
   const {
@@ -32,7 +34,20 @@ export function GlobalAudioPlayer() {
     skipBackward,
     changePlaybackSpeed,
     stopPlayback,
+    playNextSurah,
+    playPreviousSurah,
+    repeatMode,
+    repeatStartTime,
+    repeatEndTime,
+    repeatCount,
+    repeatCountRemaining,
+    showRepeatModal,
+    setShowRepeatModal,
+    setRepeatRange,
+    setRepeatMode,
+    clearRepeat,
   } = useAudio();
+  const { settings } = useSettings();
 
   const progressBarRef = useRef<View>(null);
   const [barLayout, setBarLayout] = useState({ x: 0, width: 0 });
@@ -181,6 +196,20 @@ export function GlobalAudioPlayer() {
             onResponderTerminate={handleTouchEnd}
           >
             <View style={styles.progressBar}>
+              {/* Repeat range indicator */}
+              {repeatStartTime !== null && repeatEndTime !== null && playbackDuration > 0 && (
+                <>
+                  <View 
+                    style={[
+                      styles.repeatRangeIndicator,
+                      { 
+                        left: `${(repeatStartTime / playbackDuration) * 100}%`,
+                        width: `${((repeatEndTime - repeatStartTime) / playbackDuration) * 100}%`,
+                      }
+                    ]} 
+                  />
+                </>
+              )}
               <View style={[styles.progressFill, { width: `${progressWidth}%` }]} />
               <View style={[styles.progressThumb, { left: `${progressWidth}%` }]}>
                 <View style={[styles.progressThumbInner, isSeeking && styles.progressThumbActive]} />
@@ -199,6 +228,13 @@ export function GlobalAudioPlayer() {
           </Text>
         </View>
         <View style={styles.controls}>
+          <TouchableOpacity 
+            style={[styles.skipButton, !currentSurah || currentSurah.id === 1 ? styles.skipButtonDisabled : null]} 
+            onPress={playPreviousSurah}
+            disabled={!currentSurah || currentSurah.id === 1 || isLoading}
+          >
+            <Ionicons name="play-skip-back" size={20} color={!currentSurah || currentSurah.id === 1 ? "#64748B" : "#E2E8F0"} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.skipButton} onPress={skipBackward}>
             <Ionicons name="play-back" size={20} color="#E2E8F0" />
             <Text style={styles.skipButtonText}>15</Text>
@@ -214,6 +250,13 @@ export function GlobalAudioPlayer() {
             <Text style={styles.skipButtonText}>15</Text>
             <Ionicons name="play-forward" size={20} color="#E2E8F0" />
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.skipButton, !currentSurah || currentSurah.id === 114 ? styles.skipButtonDisabled : null]} 
+            onPress={playNextSurah}
+            disabled={!currentSurah || currentSurah.id === 114 || isLoading}
+          >
+            <Ionicons name="play-skip-forward" size={20} color={!currentSurah || currentSurah.id === 114 ? "#64748B" : "#E2E8F0"} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.playerBottomRow}>
@@ -221,6 +264,33 @@ export function GlobalAudioPlayer() {
             <Ionicons name="speedometer-outline" size={16} color="#94A3B8" />
             <Text style={styles.speedButtonText}>{playbackSpeed}x</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.repeatButton, repeatMode !== 'off' && styles.repeatButtonActive]} 
+            onPress={() => setShowRepeatModal(true)}
+          >
+            <Ionicons 
+              name={repeatMode === 'infinite' ? 'repeat' : repeatMode === 'count' ? 'repeat-outline' : 'repeat-outline'} 
+              size={16} 
+              color={repeatMode !== 'off' ? COLORS.primary : "#94A3B8"} 
+            />
+            <Text style={[styles.repeatButtonText, repeatMode !== 'off' && styles.repeatButtonTextActive]}>
+              {repeatMode === 'infinite' ? '∞' : repeatMode === 'count' ? `${repeatCountRemaining}` : 'Repeat'}
+            </Text>
+          </TouchableOpacity>
+
+          {settings.autoPlayNext && (
+            <View style={[styles.shuffleButton, settings.shufflePlay && styles.shuffleButtonActive]}>
+              <Ionicons 
+                name="shuffle" 
+                size={16} 
+                color={settings.shufflePlay ? COLORS.primary : "#94A3B8"} 
+              />
+              <Text style={[styles.shuffleButtonText, settings.shufflePlay && styles.shuffleButtonTextActive]}>
+                {settings.shufflePlay ? 'Shuffle' : 'Next'}
+              </Text>
+            </View>
+          )}
 
           <TouchableOpacity
             style={styles.collapseButton}
@@ -265,11 +335,217 @@ export function GlobalAudioPlayer() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <RepeatModal
+        visible={showRepeatModal}
+        onClose={() => setShowRepeatModal(false)}
+        playbackPosition={playbackPosition}
+        playbackDuration={playbackDuration}
+        repeatMode={repeatMode}
+        repeatStartTime={repeatStartTime}
+        repeatEndTime={repeatEndTime}
+        repeatCount={repeatCount}
+        onSetRepeatRange={setRepeatRange}
+        onSetRepeatMode={setRepeatMode}
+        onClearRepeat={clearRepeat}
+      />
     </>
   );
 }
 
-const TAB_BAR_HEIGHT = 80;
+interface RepeatModalProps {
+  visible: boolean;
+  onClose: () => void;
+  playbackPosition: number;
+  playbackDuration: number;
+  repeatMode: RepeatMode;
+  repeatStartTime: number | null;
+  repeatEndTime: number | null;
+  repeatCount: number;
+  onSetRepeatRange: (startTime: number, endTime: number) => void;
+  onSetRepeatMode: (mode: RepeatMode, count?: number) => void;
+  onClearRepeat: () => void;
+}
+
+function RepeatModal({
+  visible,
+  onClose,
+  playbackPosition,
+  playbackDuration,
+  repeatMode,
+  repeatStartTime,
+  repeatEndTime,
+  repeatCount,
+  onSetRepeatRange,
+  onSetRepeatMode,
+  onClearRepeat,
+}: RepeatModalProps) {
+  const [localStartTime, setLocalStartTime] = useState<number>(repeatStartTime ?? playbackPosition);
+  const [localEndTime, setLocalEndTime] = useState<number>(repeatEndTime ?? playbackPosition + 10000);
+  const [localCount, setLocalCount] = useState<string>(repeatCount.toString());
+  const [selectedMode, setSelectedMode] = useState<RepeatMode>(repeatMode);
+
+  // Update local state when modal opens or props change
+  React.useEffect(() => {
+    if (visible) {
+      setLocalStartTime(repeatStartTime ?? playbackPosition);
+      setLocalEndTime(repeatEndTime ?? Math.min(playbackPosition + 10000, playbackDuration));
+      setLocalCount(repeatCount.toString());
+      setSelectedMode(repeatMode);
+    }
+  }, [visible, repeatStartTime, repeatEndTime, repeatCount, repeatMode, playbackPosition, playbackDuration]);
+
+  const formatTime = (millis: number) => {
+    if (!millis) return '0:00';
+    const totalSeconds = Math.floor(millis / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const handleSetStart = () => {
+    const clamped = Math.max(0, Math.min(playbackPosition, playbackDuration));
+    setLocalStartTime(clamped);
+  };
+
+  const handleSetEnd = () => {
+    const clamped = Math.max(0, Math.min(playbackPosition, playbackDuration));
+    setLocalEndTime(clamped);
+  };
+
+  const handleApply = () => {
+    // Clamp values to valid range
+    const start = Math.max(0, Math.min(Math.min(localStartTime, localEndTime), playbackDuration));
+    const end = Math.max(0, Math.min(Math.max(localStartTime, localEndTime), playbackDuration));
+    
+    // Ensure start < end
+    if (start >= end) {
+      // If invalid, set a small range from current position
+      const newStart = Math.max(0, playbackPosition - 5000);
+      const newEnd = Math.min(playbackDuration, playbackPosition + 5000);
+      onSetRepeatRange(newStart, newEnd);
+    } else {
+      onSetRepeatRange(start, end);
+    }
+    
+    if (selectedMode === 'count') {
+      const count = Math.max(1, parseInt(localCount) || 1);
+      onSetRepeatMode('count', count);
+    } else if (selectedMode === 'infinite') {
+      onSetRepeatMode('infinite');
+    } else {
+      onSetRepeatMode('off');
+    }
+    onClose();
+  };
+
+  const handleClear = () => {
+    onClearRepeat();
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        style={styles.repeatModalOverlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <View style={styles.repeatModalContainer} onStartShouldSetResponder={() => true}>
+          <Text style={styles.repeatModalTitle}>تكرار</Text>
+          <Text style={styles.repeatModalSubtitle}>Repeat Section</Text>
+
+          {/* Set Range Section */}
+          <View style={styles.repeatSection}>
+            <Text style={styles.repeatSectionTitle}>Set Range</Text>
+            <View style={styles.repeatTimeRow}>
+              <View style={styles.repeatTimeControl}>
+                <Text style={styles.repeatTimeLabel}>Start</Text>
+                <Text style={styles.repeatTimeValue}>{formatTime(localStartTime)}</Text>
+                <TouchableOpacity style={styles.repeatSetButton} onPress={handleSetStart}>
+                  <Text style={styles.repeatSetButtonText}>Set to Current</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.repeatTimeControl}>
+                <Text style={styles.repeatTimeLabel}>End</Text>
+                <Text style={styles.repeatTimeValue}>{formatTime(localEndTime)}</Text>
+                <TouchableOpacity style={styles.repeatSetButton} onPress={handleSetEnd}>
+                  <Text style={styles.repeatSetButtonText}>Set to Current</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          {/* Repeat Mode Selection */}
+          <View style={styles.repeatSection}>
+            <Text style={styles.repeatSectionTitle}>Repeat Mode</Text>
+            <View style={styles.repeatModeOptions}>
+              <TouchableOpacity
+                style={[styles.repeatModeOption, selectedMode === 'off' && styles.repeatModeOptionActive]}
+                onPress={() => setSelectedMode('off')}
+              >
+                <Ionicons name="close-circle-outline" size={20} color={selectedMode === 'off' ? COLORS.primary : COLORS.textSecondary} />
+                <Text style={[styles.repeatModeOptionText, selectedMode === 'off' && styles.repeatModeOptionTextActive]}>
+                  Off
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.repeatModeOption, selectedMode === 'count' && styles.repeatModeOptionActive]}
+                onPress={() => setSelectedMode('count')}
+              >
+                <Ionicons name="repeat-outline" size={20} color={selectedMode === 'count' ? COLORS.primary : COLORS.textSecondary} />
+                <Text style={[styles.repeatModeOptionText, selectedMode === 'count' && styles.repeatModeOptionTextActive]}>
+                  Count
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.repeatModeOption, selectedMode === 'infinite' && styles.repeatModeOptionActive]}
+                onPress={() => setSelectedMode('infinite')}
+              >
+                <Ionicons name="repeat" size={20} color={selectedMode === 'infinite' ? COLORS.primary : COLORS.textSecondary} />
+                <Text style={[styles.repeatModeOptionText, selectedMode === 'infinite' && styles.repeatModeOptionTextActive]}>
+                  Infinite
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Count Input */}
+          {selectedMode === 'count' && (
+            <View style={styles.repeatSection}>
+              <Text style={styles.repeatSectionTitle}>Repeat Count</Text>
+              <TextInput
+                style={styles.repeatCountInput}
+                value={localCount}
+                onChangeText={setLocalCount}
+                keyboardType="numeric"
+                placeholder="Enter number"
+                placeholderTextColor={COLORS.textSecondary}
+              />
+            </View>
+          )}
+
+          {/* Action Buttons */}
+          <View style={styles.repeatActionButtons}>
+            <TouchableOpacity style={styles.repeatClearButton} onPress={handleClear}>
+              <Text style={styles.repeatClearButtonText}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.repeatApplyButton} onPress={handleApply}>
+              <Text style={styles.repeatApplyButtonText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+const TAB_BAR_HEIGHT = 70;
 
 const styles = StyleSheet.create({
   minimizedPlayerContainer: {
@@ -439,6 +715,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     gap: 4,
   },
+  skipButtonDisabled: {
+    opacity: 0.5,
+  },
   skipButtonText: {
     fontSize: 11,
     fontWeight: 'bold',
@@ -539,6 +818,191 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   speedOptionTextActive: {
+    color: COLORS.secondary,
+  },
+  repeatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surfaceLight,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 4,
+  },
+  repeatButtonActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+  },
+  repeatButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  repeatButtonTextActive: {
+    color: COLORS.primary,
+  },
+  shuffleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surfaceLight,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 4,
+  },
+  shuffleButtonActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+  },
+  shuffleButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  shuffleButtonTextActive: {
+    color: COLORS.primary,
+  },
+  repeatRangeIndicator: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(16, 185, 129, 0.3)',
+    borderRadius: 2,
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
+    borderColor: COLORS.primary,
+  },
+  repeatModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  repeatModalContainer: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: 24,
+    width: '85%',
+    maxWidth: 400,
+  },
+  repeatModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  repeatModalSubtitle: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  repeatSection: {
+    marginBottom: 20,
+  },
+  repeatSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 12,
+  },
+  repeatTimeRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  repeatTimeControl: {
+    flex: 1,
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+  },
+  repeatTimeLabel: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  repeatTimeValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 8,
+  },
+  repeatSetButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  repeatSetButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.secondary,
+  },
+  repeatModeOptions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  repeatModeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surfaceLight,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    gap: 6,
+  },
+  repeatModeOptionActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+  },
+  repeatModeOptionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  repeatModeOptionTextActive: {
+    color: COLORS.primary,
+  },
+  repeatCountInput: {
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    color: COLORS.text,
+    textAlign: 'center',
+  },
+  repeatActionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  repeatClearButton: {
+    flex: 1,
+    backgroundColor: COLORS.surfaceLight,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  repeatClearButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  repeatApplyButton: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  repeatApplyButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: COLORS.secondary,
   },
 });

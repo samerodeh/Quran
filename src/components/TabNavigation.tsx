@@ -15,11 +15,8 @@ export function TabNavigation({ activeTab, setActiveTab }: TabNavigationProps) {
         style={[styles.navTab, activeTab === 'read' && styles.navTabActive]}
         onPress={() => setActiveTab('read')}
       >
-        <Ionicons name="book" size={22} color={activeTab === 'read' ? COLORS.primary : COLORS.textSecondary} />
+        <Ionicons name="book" size={20} color={activeTab === 'read' ? COLORS.primary : COLORS.textSecondary} />
         <Text style={[styles.navTabText, activeTab === 'read' && styles.navTabTextActive]}>
-          Read
-        </Text>
-        <Text style={[styles.navTabArabic, activeTab === 'read' && styles.navTabTextActive]}>
           قراءة
         </Text>
       </TouchableOpacity>
@@ -28,32 +25,56 @@ export function TabNavigation({ activeTab, setActiveTab }: TabNavigationProps) {
         style={[styles.navTab, activeTab === 'listen' && styles.navTabActive]}
         onPress={() => setActiveTab('listen')}
       >
-        <Ionicons name="headset" size={22} color={activeTab === 'listen' ? COLORS.primary : COLORS.textSecondary} />
+        <Ionicons name="headset" size={20} color={activeTab === 'listen' ? COLORS.primary : COLORS.textSecondary} />
         <Text style={[styles.navTabText, activeTab === 'listen' && styles.navTabTextActive]}>
-          Listen
-        </Text>
-        <Text style={[styles.navTabArabic, activeTab === 'listen' && styles.navTabTextActive]}>
           استماع
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.navTab, activeTab === 'athan' && styles.navTabActive]}
-        onPress={() => setActiveTab('athan')}
+        style={[styles.navTab, activeTab === 'salah' && styles.navTabActive]}
+        onPress={() => setActiveTab('salah')}
       >
-        <Ionicons name="volume-high" size={22} color={activeTab === 'athan' ? COLORS.primary : COLORS.textSecondary} />
-        <Text style={[styles.navTabText, activeTab === 'athan' && styles.navTabTextActive]}>
-          Athan
+        <Ionicons name="time" size={20} color={activeTab === 'salah' ? COLORS.primary : COLORS.textSecondary} />
+        <Text style={[styles.navTabText, activeTab === 'salah' && styles.navTabTextActive]}>
+          الصلاة
         </Text>
-        <Text style={[styles.navTabArabic, activeTab === 'athan' && styles.navTabTextActive]}>
-          الأذان
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.navTab, activeTab === 'athkar' && styles.navTabActive]}
+        onPress={() => setActiveTab('athkar')}
+      >
+        <Ionicons name="heart" size={20} color={activeTab === 'athkar' ? COLORS.primary : COLORS.textSecondary} />
+        <Text style={[styles.navTabText, activeTab === 'athkar' && styles.navTabTextActive]}>
+          أذكار
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.navTab, activeTab === 'qibla' && styles.navTabActive]}
+        onPress={() => setActiveTab('qibla')}
+      >
+        <Ionicons name="compass" size={20} color={activeTab === 'qibla' ? COLORS.primary : COLORS.textSecondary} />
+        <Text style={[styles.navTabText, activeTab === 'qibla' && styles.navTabTextActive]}>
+          القبلة
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.navTab, activeTab === 'settings' && styles.navTabActive]}
+        onPress={() => setActiveTab('settings')}
+      >
+        <Ionicons name="settings" size={20} color={activeTab === 'settings' ? COLORS.primary : COLORS.textSecondary} />
+        <Text style={[styles.navTabText, activeTab === 'settings' && styles.navTabTextActive]}>
+          الإعدادات
         </Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-const TAB_BAR_HEIGHT = 80;
+export const TAB_BAR_HEIGHT = 70;
 
 const styles = StyleSheet.create({
   bottomNav: {
@@ -62,12 +83,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     height: TAB_BAR_HEIGHT,
-    paddingTop: 8,
+    paddingTop: 6,
+    paddingBottom: 8,
   },
   navTab: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   navTabActive: {
     borderTopWidth: 2,
@@ -75,14 +97,9 @@ const styles = StyleSheet.create({
     marginTop: -2,
   },
   navTabText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 4,
-  },
-  navTabArabic: {
     fontSize: 10,
     color: COLORS.textSecondary,
-    marginTop: 1,
+    marginTop: 3,
   },
   navTabTextActive: {
     color: COLORS.primary,

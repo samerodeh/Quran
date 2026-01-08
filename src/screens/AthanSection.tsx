@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Muezzin, PrayerName, COLORS } from '../types';
+
+
 import { athans } from '../data/athans';
 import { useAthan } from '../contexts/AthanContext';
 
@@ -439,4 +441,5 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 });
+
 

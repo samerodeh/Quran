@@ -1,30 +1,71 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FlatList, TouchableOpacity, Text, SafeAreaView, View, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { ReciterSelectScreenProps, Reciter, COLORS } from '../types';
 import { hafsReciters, warshReciters } from '../data/reciters';
+import { useFavorites } from '../contexts/FavoritesContext';
 
 export function ReciterSelectScreen({ narration, onSelectReciter, onBack }: ReciterSelectScreenProps) {
-  const reciters = narration === 'warsh' ? warshReciters : hafsReciters;
+  const allReciters = narration === 'warsh' ? warshReciters : hafsReciters;
   const narrationName = narration === 'warsh' ? 'ورش عن نافع' : 'حفص عن عاصم';
   const narrationEnglish = narration === 'warsh' ? 'Warsh' : 'Hafs';
+  const { isFavorite, toggleFavorite } = useFavorites();
 
-  const renderReciterItem = ({ item }: { item: Reciter }) => (
-    <TouchableOpacity
-      style={styles.reciterCard}
-      onPress={() => onSelectReciter(item)}
-      activeOpacity={0.8}
-    >
-      <View style={styles.reciterImageContainer}>
-        <Text style={styles.reciterEmoji}>🎙️</Text>
-      </View>
-      <View style={styles.reciterInfo}>
-        <Text style={styles.reciterArabicName}>{item.arabicName}</Text>
-        <Text style={styles.reciterEnglishName}>{item.name}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={24} color={COLORS.textSecondary} />
-    </TouchableOpacity>
-  );
+  // Sort reciters: favorites first, then others
+  const reciters = useMemo(() => {
+    const favorites: Reciter[] = [];
+    const others: Reciter[] = [];
+    
+    allReciters.forEach(reciter => {
+      if (isFavorite(reciter.id)) {
+        favorites.push(reciter);
+      } else {
+        others.push(reciter);
+      }
+    });
+    
+    return [...favorites, ...others];
+  }, [allReciters, isFavorite]);
+
+  const handleFavoritePress = (e: any, reciterId: string) => {
+    e.stopPropagation();
+    toggleFavorite(reciterId);
+  };
+
+  const renderReciterItem = ({ item }: { item: Reciter }) => {
+    const favorite = isFavorite(item.id);
+    return (
+      <TouchableOpacity
+        style={[styles.reciterCard, favorite && styles.reciterCardFavorite]}
+        onPress={() => onSelectReciter(item)}
+        activeOpacity={0.8}
+      >
+        <View style={styles.reciterImageContainer}>
+          <Text style={styles.reciterEmoji}>🎙️</Text>
+        </View>
+        <View style={styles.reciterInfo}>
+          <View style={styles.reciterNameRow}>
+            <Text style={styles.reciterArabicName}>{item.arabicName}</Text>
+            {favorite && (
+              <Ionicons name="star" size={16} color={COLORS.primary} style={styles.favoriteStar} />
+            )}
+          </View>
+          <Text style={styles.reciterEnglishName}>{item.name}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.favoriteButton}
+          onPress={(e) => handleFavoritePress(e, item.id)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons 
+            name={favorite ? 'star' : 'star-outline'} 
+            size={24} 
+            color={favorite ? COLORS.primary : COLORS.textSecondary} 
+          />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -46,6 +87,12 @@ export function ReciterSelectScreen({ narration, onSelectReciter, onBack }: Reci
       <View style={styles.reciterSection}>
         <Text style={styles.reciterSectionTitle}>اختر القارئ</Text>
         <Text style={styles.reciterSectionSubtitle}>Choose a Reciter</Text>
+        {reciters.some(r => isFavorite(r.id)) && (
+          <View style={styles.favoritesHint}>
+            <Ionicons name="star" size={14} color={COLORS.primary} />
+            <Text style={styles.favoritesHintText}>Favorites appear first</Text>
+          </View>
+        )}
       </View>
 
       <FlatList
@@ -159,5 +206,33 @@ const styles = StyleSheet.create({
   reciterEnglishName: {
     fontSize: 14,
     color: COLORS.textSecondary,
+  },
+  reciterCardFavorite: {
+    borderColor: COLORS.primary,
+    borderWidth: 1.5,
+  },
+  reciterNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  favoriteStar: {
+    marginLeft: 4,
+  },
+  favoriteButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  favoritesHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    gap: 6,
+  },
+  favoritesHintText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
   },
 });

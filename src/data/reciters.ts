@@ -38,6 +38,46 @@ export const hafsReciters: Reciter[] = [
     folderCode: 'lhdan',
     narration: 'Hafs',
   },
+  {
+    id: 'hosary',
+    name: 'Mahmoud Khalil Al-Hosary',
+    arabicName: 'الحصري',
+    server: 'server13.mp3quran.net',
+    folderCode: 'husr',
+    narration: 'Hafs',
+  },
+  {
+    id: 'minshawi',
+    name: 'Muhammad Siddiq Al-Minshawi',
+    arabicName: 'المنشاوي',
+    server: 'server10.mp3quran.net',
+    folderCode: 'minsh',
+    narration: 'Hafs',
+  },
+  {
+    id: 'saad',
+    name: 'Saad Al-Ghamdi',
+    arabicName: 'سعد الغامدي',
+    server: 'server7.mp3quran.net',
+    folderCode: 's_gmd',
+    narration: 'Hafs',
+  },
+  {
+    id: 'badr',
+    name: 'Badr Al-Turki',
+    arabicName: 'بدر التركي',
+    server: 'server10.mp3quran.net',
+    folderCode: 'bader/Rewayat-Hafs-A-n-Assem',
+    narration: 'Hafs',
+  },
+  {
+    id: 'raad',
+    name: 'Raad Al-Kurdi',
+    arabicName: 'رعد الكردي',
+    server: 'server6.mp3quran.net',
+    folderCode: 'kurdi',
+    narration: 'Hafs',
+  },
 ];
 
 // Warsh reciters (North & West African narration)

@@ -37,8 +37,10 @@ export interface Narration {
   description: string;
 }
 
+export type RepeatMode = 'off' | 'count' | 'infinite';
+
 export interface AudioPlayerState {
-  sound: any; // Expo Audio.Sound instance
+  sound: any; // Audio.Sound instance (Expo removed)
   soundRef: React.RefObject<any>;
   isPlaying: boolean;
   isLoading: boolean;
@@ -61,18 +63,32 @@ export interface AudioPlayerState {
   progressBarWidth: React.RefObject<number>;
   playbackDurationRef: React.RefObject<number>;
   PLAYBACK_SPEEDS: number[];
+  // Repeat functionality
+  repeatMode: RepeatMode;
+  repeatStartTime: number | null;
+  repeatEndTime: number | null;
+  repeatCount: number;
+  repeatCountRemaining: number;
+  showRepeatModal: boolean;
+  setShowRepeatModal: (show: boolean) => void;
+  setRepeatRange: (startTime: number, endTime: number) => void;
+  setRepeatMode: (mode: RepeatMode, count?: number) => void;
+  clearRepeat: () => void;
   playSurah: (surah: Surah, reciter: Reciter) => Promise<void>;
   togglePlayPause: () => Promise<void>;
   skipForward: () => Promise<void>;
   skipBackward: () => Promise<void>;
   changePlaybackSpeed: (speed: number) => Promise<void>;
   stopPlayback: () => Promise<void>;
+  playNextSurah: () => Promise<void>;
+  playPreviousSurah: () => Promise<void>;
 }
 
 export interface TabNavigationProps {
   activeTab: 'read' | 'listen' | 'athan';
   setActiveTab: (tab: 'read' | 'listen' | 'athan') => void;
 }
+
 
 export interface ScreenProps {
   onBack?: () => void;
@@ -197,8 +213,35 @@ export interface AthanSettings {
   ishaEnabled: boolean;
 }
 
+// Athkar types
+export interface AthkarCategory {
+  id: string;
+  name: string;
+  arabicName: string;
+  icon?: string;
+  color?: string;
+  locked?: boolean;
+}
+
+// Settings types
+export type LanguageCode = 'ar' | 'en' | 'tr' | 'fr' | 'es' | 'ur' | 'id' | 'de';
+
+export interface Language {
+  code: LanguageCode;
+  name: string;
+  nativeName: string;
+}
+
+export interface AppSettings {
+  autoPlayNext: boolean;
+  shufflePlay: boolean;
+  primaryLanguage: LanguageCode; // Always Arabic (ar)
+  secondaryLanguage: LanguageCode; // Always English (en)
+  displayLanguage: LanguageCode; // User can switch between Arabic and other languages
+}
+
 // Utility types
 export type PlaybackSpeed = typeof PLAYBACK_SPEEDS[number];
-export type TabType = 'read' | 'listen' | 'athan';
+export type TabType = 'read' | 'listen' | 'salah' | 'athkar' | 'qibla' | 'settings';
 export type NarrationType = 'hafs' | 'warsh';
 export type PrayerName = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';

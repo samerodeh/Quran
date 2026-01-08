@@ -53,7 +53,7 @@ export function AthanProvider({ children }: { children: React.ReactNode }) {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [currentlyPlaying, setCurrentlyPlaying] = useState<Muezzin | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  // const [sound, setSound] = useState<Audio.Sound | null>(null);
 
   // Load saved settings on mount
   useEffect(() => {
@@ -77,14 +77,14 @@ export function AthanProvider({ children }: { children: React.ReactNode }) {
     }
   }, [settings, prayerTimes]);
 
-  // Cleanup sound on unmount
-  useEffect(() => {
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
-  }, [sound]);
+  // Audio cleanup removed (was using expo-av)
+  // useEffect(() => {
+  //   return () => {
+  //     if (sound) {
+  //       sound.unloadAsync();
+  //     }
+  //   };
+  // }, [sound]);
 
   const loadSettings = async () => {
     try {
@@ -116,21 +116,22 @@ export function AthanProvider({ children }: { children: React.ReactNode }) {
   };
 
   const requestPermissions = async () => {
-    // Request notification permission
-    const { status: notifStatus } = await Notifications.requestPermissionsAsync();
-    if (notifStatus !== 'granted') {
-      Alert.alert(
-        'Permission Required',
-        'Please enable notifications to receive athan alerts.',
-        [{ text: 'OK' }]
-      );
-    }
+    // Permissions removed (was using expo-notifications and expo-location)
+    // // Request notification permission
+    // const { status: notifStatus } = await Notifications.requestPermissionsAsync();
+    // if (notifStatus !== 'granted') {
+    //   Alert.alert(
+    //     'Permission Required',
+    //     'Please enable notifications to receive athan alerts.',
+    //     [{ text: 'OK' }]
+    //   );
+    // }
 
-    // Request location permission
-    const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
-    if (locStatus !== 'granted') {
-      setLocationError('Location permission is required to calculate prayer times');
-    }
+    // // Request location permission
+    // const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
+    // if (locStatus !== 'granted') {
+    //   setLocationError('Location permission is required to calculate prayer times');
+    // }
   };
 
   const fetchPrayerTimes = async () => {
@@ -138,18 +139,21 @@ export function AthanProvider({ children }: { children: React.ReactNode }) {
     setLocationError(null);
 
     try {
-      const { status } = await Location.getForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setLocationError('Location permission not granted');
-        setIsLoadingLocation(false);
-        return;
-      }
+      // Location services removed (was using expo-location)
+      // const { status } = await Location.getForegroundPermissionsAsync();
+      // if (status !== 'granted') {
+      //   setLocationError('Location permission not granted');
+      //   setIsLoadingLocation(false);
+      //   return;
+      // }
 
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      // const location = await Location.getCurrentPositionAsync({
+      //   accuracy: Location.Accuracy.Balanced,
+      // });
 
-      const { latitude, longitude } = location.coords;
+      // const { latitude, longitude } = location.coords;
+      const latitude = 0;
+      const longitude = 0;
       
       // Use Aladhan API for prayer times
       const today = new Date();
@@ -181,9 +185,11 @@ export function AthanProvider({ children }: { children: React.ReactNode }) {
   };
 
   const scheduleNotifications = async () => {
-    // Cancel existing notifications first
-    await cancelAllNotifications();
+    // Notifications removed (was using expo-notifications)
+    // // Cancel existing notifications first
+    // await cancelAllNotifications();
 
+    // if (!prayerTimes || !settings.selectedMuezzin) return;
     if (!prayerTimes || !settings.selectedMuezzin) return;
 
     const prayers: { name: PrayerName; time: string; enabled: boolean }[] = [
@@ -218,23 +224,25 @@ export function AthanProvider({ children }: { children: React.ReactNode }) {
         prayerDate.setDate(prayerDate.getDate() + 1);
       }
 
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: `🕌 ${prayerNames[prayer.name]}`,
-          body: `It's time for ${prayer.name.charAt(0).toUpperCase() + prayer.name.slice(1)} prayer`,
-          sound: true,
-          data: { prayer: prayer.name, muezzinId: settings.selectedMuezzin?.id },
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: prayerDate,
-        },
-      });
+      // Notifications removed (was using expo-notifications)
+      // await Notifications.scheduleNotificationAsync({
+      //   content: {
+      //     title: `🕌 ${prayerNames[prayer.name]}`,
+      //     body: `It's time for ${prayer.name.charAt(0).toUpperCase() + prayer.name.slice(1)} prayer`,
+      //     sound: true,
+      //     data: { prayer: prayer.name, muezzinId: settings.selectedMuezzin?.id },
+      //   },
+      //   trigger: {
+      //     type: Notifications.SchedulableTriggerInputTypes.DATE,
+      //     date: prayerDate,
+      //   },
+      // });
     }
   };
 
   const cancelAllNotifications = async () => {
-    await Notifications.cancelAllScheduledNotificationsAsync();
+    // Notifications removed (was using expo-notifications)
+    // await Notifications.cancelAllScheduledNotificationsAsync();
   };
 
   const setSelectedMuezzin = useCallback((muezzin: Muezzin) => {
@@ -257,44 +265,46 @@ export function AthanProvider({ children }: { children: React.ReactNode }) {
   }, [settings]);
 
   const playAthan = useCallback(async (muezzin: Muezzin) => {
-    try {
-      // Stop any existing playback
-      if (sound) {
-        await sound.stopAsync();
-        await sound.unloadAsync();
-      }
+    // Audio playback removed (was using expo-av)
+    // try {
+    //   // Stop any existing playback
+    //   if (sound) {
+    //     await sound.stopAsync();
+    //     await sound.unloadAsync();
+    //   }
 
-      setCurrentlyPlaying(muezzin);
-      setIsPlaying(true);
+    //   setCurrentlyPlaying(muezzin);
+    //   setIsPlaying(true);
 
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: muezzin.audioUrl },
-        { shouldPlay: true },
-        (status) => {
-          if (status.isLoaded && status.didJustFinish) {
-            setIsPlaying(false);
-            setCurrentlyPlaying(null);
-          }
-        }
-      );
+    //   const { sound: newSound } = await Audio.Sound.createAsync(
+    //     { uri: muezzin.audioUrl },
+    //     { shouldPlay: true },
+    //     (status) => {
+    //       if (status.isLoaded && status.didJustFinish) {
+    //         setIsPlaying(false);
+    //         setCurrentlyPlaying(null);
+    //       }
+    //     }
+    //   );
 
-      setSound(newSound);
-    } catch (error) {
-      console.error('Error playing athan:', error);
-      setIsPlaying(false);
-      setCurrentlyPlaying(null);
-    }
-  }, [sound]);
+    //   setSound(newSound);
+    // } catch (error) {
+    //   console.error('Error playing athan:', error);
+    //   setIsPlaying(false);
+    //   setCurrentlyPlaying(null);
+    // }
+  }, []);
 
   const stopAthan = useCallback(async () => {
-    if (sound) {
-      await sound.stopAsync();
-      await sound.unloadAsync();
-      setSound(null);
-    }
+    // Audio playback removed (was using expo-av)
+    // if (sound) {
+    //   await sound.stopAsync();
+    //   await sound.unloadAsync();
+    //   setSound(null);
+    // }
     setIsPlaying(false);
     setCurrentlyPlaying(null);
-  }, [sound]);
+  }, []);
 
   const refreshPrayerTimes = useCallback(async () => {
     await fetchPrayerTimes();

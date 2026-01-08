@@ -40,36 +40,37 @@ export function DownloadProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loadExistingDownloads = async () => {
-    try {
-      const audioDir = getAudioDirectory();
-      
-      if (!audioDir.exists) {
-        audioDir.create();
-        return;
-      }
+    // File system operations removed (was using expo-file-system)
+    // try {
+    //   const audioDir = getAudioDirectory();
+    //   
+    //   if (!audioDir.exists) {
+    //     audioDir.create();
+    //     return;
+    //   }
 
-      // Scan for downloaded files
-      const downloadedFiles: Record<string, boolean> = {};
+    //   // Scan for downloaded files
+    //   const downloadedFiles: Record<string, boolean> = {};
 
-      // List subdirectories (reciter folders)
-      for (const entry of audioDir.list()) {
-        if (entry instanceof Directory) {
-          const reciterId = entry.name;
-          // List files in reciter folder
-          for (const file of entry.list()) {
-            if (file instanceof File && file.name.endsWith('.mp3')) {
-              const surahId = parseInt(file.name.replace('.mp3', ''), 10);
-              const key = getDownloadKey(reciterId, surahId);
-              downloadedFiles[key] = true;
-            }
-          }
-        }
-      }
+    //   // List subdirectories (reciter folders)
+    //   for (const entry of audioDir.list()) {
+    //     if (entry instanceof Directory) {
+    //       const reciterId = entry.name;
+    //       // List files in reciter folder
+    //       for (const file of entry.list()) {
+    //         if (file instanceof File && file.name.endsWith('.mp3')) {
+    //           const surahId = parseInt(file.name.replace('.mp3', ''), 10);
+    //           const key = getDownloadKey(reciterId, surahId);
+    //           downloadedFiles[key] = true;
+    //         }
+    //       }
+    //     }
+    //   }
 
-      setDownloads(downloadedFiles);
-    } catch (error) {
-      console.error('Error loading downloads:', error);
-    }
+    //   setDownloads(downloadedFiles);
+    // } catch (error) {
+    //   console.error('Error loading downloads:', error);
+    // }
   };
 
   const isDownloaded = useCallback((reciterId: string, surahId: number): boolean => {
@@ -100,82 +101,85 @@ export function DownloadProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const audioUrl = getAudioUrl(surah.id, reciter);
-    const reciterDir = getReciterDirectory(reciter.id);
-    const audioFile = getAudioFile(reciter.id, surah.id);
+    // File system operations removed (was using expo-file-system)
+    // const audioUrl = getAudioUrl(surah.id, reciter);
+    // const reciterDir = getReciterDirectory(reciter.id);
+    // const audioFile = getAudioFile(reciter.id, surah.id);
 
-    try {
-      // Create reciter directory if needed
-      if (!reciterDir.exists) {
-        reciterDir.create();
-      }
+    // try {
+    //   // Create reciter directory if needed
+    //   if (!reciterDir.exists) {
+    //     reciterDir.create();
+    //   }
 
-      // Start download with progress tracking
-      setDownloading(prev => ({
-        ...prev,
-        [key]: { surahId: surah.id, reciterId: reciter.id, progress: 0 }
-      }));
+    //   // Start download with progress tracking
+    //   setDownloading(prev => ({
+    //     ...prev,
+    //     [key]: { surahId: surah.id, reciterId: reciter.id, progress: 0 }
+    //   }));
 
-      // Fetch the audio file
-      const response = await fetch(audioUrl);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+    //   // Fetch the audio file
+    //   const response = await fetch(audioUrl);
+    //   
+    //   if (!response.ok) {
+    //     throw new Error(`HTTP error! status: ${response.status}`);
+    //   }
 
-      const blob = await response.blob();
-      const arrayBuffer = await blob.arrayBuffer();
-      
-      // Write to file using base64
-      const base64 = btoa(
-        new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-      );
-      audioFile.create();
-      audioFile.write(base64, { encoding: 'base64' });
+    //   const blob = await response.blob();
+    //   const arrayBuffer = await blob.arrayBuffer();
+    //   
+    //   // Write to file using base64
+    //   const base64 = btoa(
+    //     new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+    //   );
+    //   audioFile.create();
+    //   audioFile.write(base64, { encoding: 'base64' });
 
-      // Download successful
-      setDownloads(prev => ({ ...prev, [key]: true }));
-      setDownloading(prev => ({
-        ...prev,
-        [key]: { surahId: surah.id, reciterId: reciter.id, progress: 100 }
-      }));
-    } catch (error) {
-      console.error('Download error:', error);
-    } finally {
-      // Remove from downloading state
-      setDownloading(prev => {
-        const newState = { ...prev };
-        delete newState[key];
-        return newState;
-      });
-    }
+    //   // Download successful
+    //   setDownloads(prev => ({ ...prev, [key]: true }));
+    //   setDownloading(prev => ({
+    //     ...prev,
+    //     [key]: { surahId: surah.id, reciterId: reciter.id, progress: 100 }
+    //   }));
+    // } catch (error) {
+    //   console.error('Download error:', error);
+    // } finally {
+    //   // Remove from downloading state
+    //   setDownloading(prev => {
+    //     const newState = { ...prev };
+    //     delete newState[key];
+    //     return newState;
+    //   });
+    // }
   }, [downloads, downloading]);
 
   const deleteSurah = useCallback(async (reciterId: string, surahId: number) => {
-    const key = getDownloadKey(reciterId, surahId);
-    const audioFile = getAudioFile(reciterId, surahId);
+    // File system operations removed (was using expo-file-system)
+    // const key = getDownloadKey(reciterId, surahId);
+    // const audioFile = getAudioFile(reciterId, surahId);
 
-    try {
-      if (audioFile.exists) {
-        audioFile.delete();
-      }
-      
-      setDownloads(prev => {
-        const newState = { ...prev };
-        delete newState[key];
-        return newState;
-      });
-    } catch (error) {
-      console.error('Delete error:', error);
-    }
+    // try {
+    //   if (audioFile.exists) {
+    //     audioFile.delete();
+    //   }
+    //   
+    //   setDownloads(prev => {
+    //     const newState = { ...prev };
+    //     delete newState[key];
+    //     return newState;
+    //   });
+    // } catch (error) {
+    //   console.error('Delete error:', error);
+    // }
   }, []);
 
   const getLocalAudioUri = useCallback((reciterId: string, surahId: number): string | null => {
-    const key = getDownloadKey(reciterId, surahId);
-    if (downloads[key]) {
-      const audioFile = getAudioFile(reciterId, surahId);
-      return audioFile.uri;
-    }
+    // File system operations removed (was using expo-file-system)
+    // const key = getDownloadKey(reciterId, surahId);
+    // if (downloads[key]) {
+    //   const audioFile = getAudioFile(reciterId, surahId);
+    //   return audioFile.uri;
+    // }
     return null;
   }, [downloads]);
 

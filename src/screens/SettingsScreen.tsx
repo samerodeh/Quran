@@ -11,9 +11,11 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../types';
 import { useSettings, AVAILABLE_LANGUAGES } from '../contexts/SettingsContext';
+import { useI18n } from '../contexts/I18nContext';
 
 export function SettingsScreen({ onBack }: { onBack?: () => void }) {
   const { settings, setAutoPlayNext, setShufflePlay, setDisplayLanguage } = useSettings();
+  const { t } = useI18n();
 
   const displayLanguageInfo = AVAILABLE_LANGUAGES.find(lang => lang.code === settings.displayLanguage);
   const primaryLanguageInfo = AVAILABLE_LANGUAGES.find(lang => lang.code === settings.primaryLanguage);
@@ -22,14 +24,9 @@ export function SettingsScreen({ onBack }: { onBack?: () => void }) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        {onBack && (
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-          </TouchableOpacity>
-        )}
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>الإعدادات</Text>
-          <Text style={styles.headerSubtitle}>Settings • v1.0.2 (OTA)</Text>
+          <Text style={styles.headerTitle}>{t('settings.title')}</Text>
+          <Text style={styles.headerSubtitle}>v1.0.2 (OTA)</Text>
         </View>
         <View style={styles.headerIcon}>
           <Ionicons name="settings" size={28} color={COLORS.primary} />
@@ -39,18 +36,13 @@ export function SettingsScreen({ onBack }: { onBack?: () => void }) {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Playback Settings Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>إعدادات التشغيل</Text>
-          <Text style={styles.sectionSubtitle}>Playback Settings</Text>
+          <Text style={styles.sectionTitle}>{t('settings.playback')}</Text>
 
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>التشغيل التلقائي للسورة التالية</Text>
-              <Text style={styles.settingSubtitle}>Auto-play Next Surah</Text>
+              <Text style={styles.settingTitle}>{t('settings.autoPlayNext')}</Text>
               <Text style={styles.settingDescription}>
-                تشغيل السورة التالية تلقائياً عند انتهاء السورة الحالية
-              </Text>
-              <Text style={styles.settingDescriptionEnglish}>
-                Automatically play the next surah when the current one ends
+                {t('settings.autoPlayNextDesc')}
               </Text>
             </View>
             <Switch
@@ -63,13 +55,9 @@ export function SettingsScreen({ onBack }: { onBack?: () => void }) {
 
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>التشغيل العشوائي</Text>
-              <Text style={styles.settingSubtitle}>Shuffle Play</Text>
+              <Text style={styles.settingTitle}>{t('settings.shufflePlay')}</Text>
               <Text style={styles.settingDescription}>
-                تشغيل سورة عشوائية عند انتهاء السورة الحالية
-              </Text>
-              <Text style={styles.settingDescriptionEnglish}>
-                Play a random surah when the current one ends
+                {t('settings.shufflePlayDesc')}
               </Text>
             </View>
             <Switch
@@ -83,18 +71,13 @@ export function SettingsScreen({ onBack }: { onBack?: () => void }) {
 
         {/* Language Settings Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>إعدادات اللغة</Text>
-          <Text style={styles.sectionSubtitle}>Language Settings</Text>
+          <Text style={styles.sectionTitle}>{t('settings.language')}</Text>
 
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>اللغة الأساسية</Text>
-              <Text style={styles.settingSubtitle}>Primary Language</Text>
+              <Text style={styles.settingTitle}>{t('settings.primaryLanguage')}</Text>
               <Text style={styles.settingDescription}>
-                {primaryLanguageInfo?.nativeName} - {primaryLanguageInfo?.name}
-              </Text>
-              <Text style={styles.settingDescriptionEnglish}>
-                Always Arabic (العربية)
+                {t('settings.alwaysArabic')}
               </Text>
             </View>
             <View style={styles.languageBadge}>
@@ -104,13 +87,9 @@ export function SettingsScreen({ onBack }: { onBack?: () => void }) {
 
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>اللغة الثانوية</Text>
-              <Text style={styles.settingSubtitle}>Secondary Language</Text>
+              <Text style={styles.settingTitle}>{t('settings.secondaryLanguage')}</Text>
               <Text style={styles.settingDescription}>
-                {secondaryLanguageInfo?.nativeName} - {secondaryLanguageInfo?.name}
-              </Text>
-              <Text style={styles.settingDescriptionEnglish}>
-                Always English
+                {t('settings.alwaysEnglish')}
               </Text>
             </View>
             <View style={styles.languageBadge}>
@@ -120,59 +99,44 @@ export function SettingsScreen({ onBack }: { onBack?: () => void }) {
 
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>لغة العرض</Text>
-              <Text style={styles.settingSubtitle}>Display Language</Text>
+              <Text style={styles.settingTitle}>{t('settings.displayLanguage')}</Text>
               <Text style={styles.settingDescription}>
-                اختر اللغة التي تريد عرضها مع العربية والإنجليزية
-              </Text>
-              <Text style={styles.settingDescriptionEnglish}>
-                Choose the language to display alongside Arabic and English
+                {t('settings.displayLanguageDesc')}
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.languageSelector}
-              onPress={() => {
-                // Show language picker modal
-                // For now, cycle through available languages (excluding English as it's always secondary)
-                const availableForDisplay = AVAILABLE_LANGUAGES.filter(lang => lang.code !== 'en');
-                const currentIndex = availableForDisplay.findIndex(lang => lang.code === settings.displayLanguage);
-                const nextIndex = (currentIndex + 1) % availableForDisplay.length;
-                const nextLanguage = availableForDisplay[nextIndex];
-                if (nextLanguage) {
-                  setDisplayLanguage(nextLanguage.code);
-                }
-              }}
-            >
-              <Text style={styles.languageSelectorText}>
+            <View style={styles.languageBadge}>
+              <Text style={styles.languageBadgeText}>
                 {displayLanguageInfo?.nativeName} ({displayLanguageInfo?.name})
               </Text>
-              <Ionicons name="chevron-down" size={20} color={COLORS.textSecondary} />
-            </TouchableOpacity>
+            </View>
           </View>
         </View>
 
-        {/* Language Picker Modal would go here - simplified for now */}
-        <View style={styles.languageList}>
-          {AVAILABLE_LANGUAGES.filter(lang => lang.code !== 'en').map((language) => (
-            <TouchableOpacity
-              key={language.code}
-              style={[
-                styles.languageOption,
-                settings.displayLanguage === language.code && styles.languageOptionActive,
-              ]}
-              onPress={() => setDisplayLanguage(language.code)}
-            >
-              <Text style={[
-                styles.languageOptionText,
-                settings.displayLanguage === language.code && styles.languageOptionTextActive,
-              ]}>
-                {language.nativeName} ({language.name})
-              </Text>
-              {settings.displayLanguage === language.code && (
-                <Ionicons name="checkmark" size={20} color={COLORS.primary} />
-              )}
-            </TouchableOpacity>
-          ))}
+        {/* Language Selection List */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>اختر اللغة / Choose Language</Text>
+          <View style={styles.languageList}>
+            {AVAILABLE_LANGUAGES.map((language) => (
+              <TouchableOpacity
+                key={language.code}
+                style={[
+                  styles.languageOption,
+                  settings.displayLanguage === language.code && styles.languageOptionActive,
+                ]}
+                onPress={() => setDisplayLanguage(language.code)}
+              >
+                <Text style={[
+                  styles.languageOptionText,
+                  settings.displayLanguage === language.code && styles.languageOptionTextActive,
+                ]}>
+                  {language.nativeName} ({language.name})
+                </Text>
+                {settings.displayLanguage === language.code && (
+                  <Ionicons name="checkmark-circle" size={22} color={COLORS.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -187,14 +151,11 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
-  },
-  backButton: {
-    padding: 8,
-    marginRight: 8,
   },
   headerContent: {
     flex: 1,
@@ -291,8 +252,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   languageList: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 8,
   },
   languageOption: {
     flexDirection: 'row',

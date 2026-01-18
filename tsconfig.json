@@ -1,45 +1,4 @@
 {
-  "extends": "expo/tsconfig.base",
-  "compilerOptions": {
-    "strict": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "baseUrl": "./",
-    "paths": {
-      "@/*": [
-        "src/*"
-      ],
-      "@/components/*": [
-        "src/components/*"
-      ],
-      "@/screens/*": [
-        "src/screens/*"
-      ],
-      "@/contexts/*": [
-        "src/contexts/*"
-      ],
-      "@/types/*": [
-        "src/types/*"
-      ],
-      "@/hooks/*": [
-        "src/hooks/*"
-      ],
-      "@/utils/*": [
-        "src/utils/*"
-      ],
-      "@/constants/*": [
-        "src/constants/*"
-      ]
-    }
-  },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "data/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "compilerOptions": {},
+  "extends": "expo/tsconfig.base"
 }

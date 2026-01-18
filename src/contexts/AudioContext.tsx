@@ -125,17 +125,19 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       playbackDurationRef.current = status.durationMillis || 0;
       setIsPlaying(status.isPlaying);
 
-      // Handle repeat logic
+      // Handle repeat logic for range-based repeating (when a specific range is set)
       const currentPos = status.positionMillis;
       const endTime = repeatEndTimeRef.current;
       const startTime = repeatStartTimeRef.current;
       const mode = repeatModeRef.current;
       const remaining = repeatCountRemainingRef.current;
+      const duration = status.durationMillis || 0;
 
+      // If a repeat range is set, handle reaching the end of that range
       if (mode !== 'off' && endTime !== null && startTime !== null && currentPos >= endTime) {
         // Reached end of repeat range
         if (mode === 'infinite') {
-          // Infinite repeat - jump back to start
+          // Infinite repeat - jump back to start of range
           if (soundRef.current) {
             await soundRef.current.setPositionAsync(startTime);
           }
@@ -145,7 +147,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
           repeatCountRemainingRef.current = newRemaining;
           setRepeatCountRemaining(newRemaining);
           if (newRemaining > 0) {
-            // Still have repeats left - jump back to start
+            // Still have repeats left - jump back to start of range
             if (soundRef.current) {
               await soundRef.current.setPositionAsync(startTime);
             }
@@ -156,10 +158,54 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
           }
         }
       }
+      
+      // Handle infinite repeat for entire audio (when no range is set or when audio finishes)
+      // This is handled in didJustFinish below
 
       if (status.didJustFinish) {
+        const mode = repeatModeRef.current;
+        const startTime = repeatStartTimeRef.current;
+        
+        // Handle infinite repeat - restart audio
+        if (mode === 'infinite') {
+          if (soundRef.current) {
+            // If there's a repeat range, restart from start of range, otherwise from beginning
+            const restartPosition = startTime !== null ? startTime : 0;
+            await soundRef.current.setPositionAsync(restartPosition);
+            await soundRef.current.playAsync();
+            setIsPlaying(true);
+            setPlaybackPosition(restartPosition);
+            return; // Don't proceed with auto-play logic
+          }
+        }
+        
+        // Handle count repeat - check if we have more repeats
+        if (mode === 'count') {
+          const remaining = repeatCountRemainingRef.current;
+          if (remaining > 0) {
+            const newRemaining = remaining - 1;
+            repeatCountRemainingRef.current = newRemaining;
+            setRepeatCountRemaining(newRemaining);
+            
+            if (newRemaining > 0 && soundRef.current) {
+              // Still have repeats left - restart
+              const restartPosition = startTime !== null ? startTime : 0;
+              await soundRef.current.setPositionAsync(restartPosition);
+              await soundRef.current.playAsync();
+              setIsPlaying(true);
+              setPlaybackPosition(restartPosition);
+              return; // Don't proceed with auto-play logic
+            } else {
+              // No more repeats - turn off repeat mode
+              setRepeatMode('off');
+              repeatModeRef.current = 'off';
+            }
+          }
+        }
+        
         setIsPlaying(false);
         setPlaybackPosition(0);
+        
         // Only auto-play next surah if repeat is off and auto-play is enabled
         if (repeatModeRef.current === 'off' && settings.autoPlayNext) {
           const surah = currentSurahRef.current;
@@ -214,13 +260,25 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       // Clear repeat when switching surahs
       clearRepeat();
 
+      // Audio playback options for background playback on all platforms
+      // Note: staysActiveInBackground and playsInSilentModeIOS are set via Audio.setAudioModeAsync() above
+      const audioOptions = {
+        shouldPlay: true,
+        isLooping: false,
+        isMuted: false,
+        volume: 1.0,
+        // These options work with the audio mode set globally
+        rate: playbackSpeed,
+        shouldCorrectPitch: true,
+      };
+
       let newSound;
       if (reciter?.isLocal && hasLocalAudio(reciter.id, surah.id)) {
         // Local bundled audio (from assets)
         const localAudio = getLocalAudio(reciter.id, surah.id);
         const { sound: localSound } = await Audio.Sound.createAsync(
           localAudio,
-          { shouldPlay: true },
+          audioOptions,
           onPlaybackStatusUpdate
         );
         newSound = localSound;
@@ -234,7 +292,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         if (downloadedUri) {
           const { sound: downloadedSound } = await Audio.Sound.createAsync(
             { uri: downloadedUri },
-            { shouldPlay: true },
+            audioOptions,
             onPlaybackStatusUpdate
           );
           newSound = downloadedSound;
@@ -243,7 +301,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
           const audioUrl = getAudioUrl(surah.id, reciter);
           const { sound: remoteSound } = await Audio.Sound.createAsync(
             { uri: audioUrl },
-            { shouldPlay: true },
+            audioOptions,
             onPlaybackStatusUpdate
           );
           newSound = remoteSound;
@@ -253,7 +311,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         const audioUrl = getAudioUrl(surah.id, reciter);
         const { sound: remoteSound } = await Audio.Sound.createAsync(
           { uri: audioUrl },
-          { shouldPlay: true },
+          audioOptions,
           onPlaybackStatusUpdate
         );
         newSound = remoteSound;

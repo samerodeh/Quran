@@ -2,6 +2,7 @@ import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { TabType, COLORS } from '../types';
+import { useI18n } from '../contexts/I18nContext';
 
 interface TabNavigationProps {
   activeTab: TabType;
@@ -9,6 +10,8 @@ interface TabNavigationProps {
 }
 
 export function TabNavigation({ activeTab, setActiveTab }: TabNavigationProps) {
+  const { t } = useI18n();
+  
   return (
     <View style={styles.bottomNav}>
       <TouchableOpacity
@@ -17,7 +20,7 @@ export function TabNavigation({ activeTab, setActiveTab }: TabNavigationProps) {
       >
         <Ionicons name="book" size={20} color={activeTab === 'read' ? COLORS.primary : COLORS.textSecondary} />
         <Text style={[styles.navTabText, activeTab === 'read' && styles.navTabTextActive]}>
-          قراءة
+          {t('nav.read')}
         </Text>
       </TouchableOpacity>
 
@@ -27,7 +30,7 @@ export function TabNavigation({ activeTab, setActiveTab }: TabNavigationProps) {
       >
         <Ionicons name="headset" size={20} color={activeTab === 'listen' ? COLORS.primary : COLORS.textSecondary} />
         <Text style={[styles.navTabText, activeTab === 'listen' && styles.navTabTextActive]}>
-          استماع
+          {t('nav.listen')}
         </Text>
       </TouchableOpacity>
 
@@ -37,7 +40,7 @@ export function TabNavigation({ activeTab, setActiveTab }: TabNavigationProps) {
       >
         <Ionicons name="time" size={20} color={activeTab === 'salah' ? COLORS.primary : COLORS.textSecondary} />
         <Text style={[styles.navTabText, activeTab === 'salah' && styles.navTabTextActive]}>
-          الصلاة
+          {t('nav.salah')}
         </Text>
       </TouchableOpacity>
 
@@ -47,7 +50,7 @@ export function TabNavigation({ activeTab, setActiveTab }: TabNavigationProps) {
       >
         <Ionicons name="heart" size={20} color={activeTab === 'athkar' ? COLORS.primary : COLORS.textSecondary} />
         <Text style={[styles.navTabText, activeTab === 'athkar' && styles.navTabTextActive]}>
-          أذكار
+          {t('nav.athkar')}
         </Text>
       </TouchableOpacity>
 
@@ -57,7 +60,7 @@ export function TabNavigation({ activeTab, setActiveTab }: TabNavigationProps) {
       >
         <Ionicons name="compass" size={20} color={activeTab === 'qibla' ? COLORS.primary : COLORS.textSecondary} />
         <Text style={[styles.navTabText, activeTab === 'qibla' && styles.navTabTextActive]}>
-          القبلة
+          {t('nav.qibla')}
         </Text>
       </TouchableOpacity>
 
@@ -67,7 +70,7 @@ export function TabNavigation({ activeTab, setActiveTab }: TabNavigationProps) {
       >
         <Ionicons name="settings" size={20} color={activeTab === 'settings' ? COLORS.primary : COLORS.textSecondary} />
         <Text style={[styles.navTabText, activeTab === 'settings' && styles.navTabTextActive]}>
-          الإعدادات
+          {t('nav.settings')}
         </Text>
       </TouchableOpacity>
     </View>

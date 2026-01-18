@@ -26,6 +26,7 @@ export function QiblaSection() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isCalibrated, setIsCalibrated] = useState(false);
+  const [magnetometerAvailable, setMagnetometerAvailable] = useState(true);
   const compassRotation = useRef(new Animated.Value(0)).current;
   const subscriptionRef = useRef<any>(null);
 
@@ -47,8 +48,10 @@ export function QiblaSection() {
     return qibla;
   };
 
-  // Get user location
+  // Get user location and watch for changes
   useEffect(() => {
+    let locationSubscription: Location.LocationSubscription | null = null;
+
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -56,8 +59,7 @@ export function QiblaSection() {
         return;
       }
 
-      try {
-        let loc = await Location.getCurrentPositionAsync({});
+      const updateLocation = (loc: Location.LocationObject) => {
         setLocation({
           latitude: loc.coords.latitude,
           longitude: loc.coords.longitude,
@@ -66,35 +68,74 @@ export function QiblaSection() {
         const qibla = calculateQiblaDirection(loc.coords.latitude, loc.coords.longitude);
         setQiblaDirection(qibla);
         setIsCalibrated(true);
+      };
+
+      try {
+        // Get initial location
+        let loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        updateLocation(loc);
+
+        // Watch for location changes
+        locationSubscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 30000, // Update every 30 seconds
+            distanceInterval: 500, // Or when moved 500m
+          },
+          (newLocation) => {
+            updateLocation(newLocation);
+          }
+        );
       } catch (error) {
         setErrorMsg('Could not get your location');
       }
     })();
+
+    return () => {
+      if (locationSubscription) {
+        try {
+          if (typeof locationSubscription.remove === 'function') {
+            locationSubscription.remove();
+          }
+        } catch (error) {
+          console.error('Error removing location subscription:', error);
+        }
+      }
+    };
   }, []);
 
   // Subscribe to magnetometer
   useEffect(() => {
     const subscribe = async () => {
-      const isAvailable = await Magnetometer.isAvailableAsync();
-      if (!isAvailable) {
-        setErrorMsg('Magnetometer is not available on this device');
-        return;
-      }
-
-      Magnetometer.setUpdateInterval(50);
-      subscriptionRef.current = Magnetometer.addListener((data) => {
-        // Calculate heading from magnetometer data
-        let angle = Math.atan2(data.y, data.x) * (180 / Math.PI);
-        
-        // Normalize to 0-360
-        if (Platform.OS === 'ios') {
-          angle = (360 - angle) % 360;
-        } else {
-          angle = (angle + 360) % 360;
+      try {
+        const isAvailable = await Magnetometer.isAvailableAsync();
+        if (!isAvailable) {
+          setMagnetometerAvailable(false);
+          // Don't set error - we'll show a fallback UI
+          return;
         }
-        
-        setHeading(angle);
-      });
+
+        setMagnetometerAvailable(true);
+        Magnetometer.setUpdateInterval(50);
+        subscriptionRef.current = Magnetometer.addListener((data) => {
+          // Calculate heading from magnetometer data
+          let angle = Math.atan2(data.y, data.x) * (180 / Math.PI);
+          
+          // Normalize to 0-360
+          if (Platform.OS === 'ios') {
+            angle = (360 - angle) % 360;
+          } else {
+            angle = (angle + 360) % 360;
+          }
+          
+          setHeading(angle);
+        });
+      } catch (error) {
+        console.error('Error accessing magnetometer:', error);
+        setMagnetometerAvailable(false);
+      }
     };
 
     subscribe();
@@ -108,16 +149,27 @@ export function QiblaSection() {
 
   // Animate compass rotation smoothly
   useEffect(() => {
-    // The compass dial rotates opposite to heading so that North stays at the top when facing North
-    // We subtract qiblaDirection so the Qibla marker on the dial points to actual Qibla
-    const rotationValue = -(heading - qiblaDirection);
-    
-    Animated.timing(compassRotation, {
-      toValue: rotationValue,
-      duration: 100,
-      useNativeDriver: true,
-    }).start();
-  }, [heading, qiblaDirection]);
+    if (!magnetometerAvailable) {
+      // Without magnetometer, just point Qibla marker to top (0 degrees)
+      // The dial needs to rotate so the Qibla marker (at 0° on dial) points to actual Qibla direction
+      // Since Qibla marker is at top of dial, we rotate the dial by -qiblaDirection
+      Animated.timing(compassRotation, {
+        toValue: -qiblaDirection,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      // The compass dial rotates opposite to heading so that North stays at the top when facing North
+      // We subtract qiblaDirection so the Qibla marker on the dial points to actual Qibla
+      const rotationValue = -(heading - qiblaDirection);
+      
+      Animated.timing(compassRotation, {
+        toValue: rotationValue,
+        duration: 100,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [heading, qiblaDirection, magnetometerAvailable]);
 
   const compassRotationInterpolate = compassRotation.interpolate({
     inputRange: [-360, 360],
@@ -126,17 +178,18 @@ export function QiblaSection() {
 
   // Check if pointing towards Qibla (within 10 degrees)
   // When the compass rotation brings the Qibla marker to the top (near 0), user is facing Qibla
-  const normalizedDiff = ((heading - qiblaDirection) % 360 + 360) % 360;
-  const isPointingToQibla = normalizedDiff < 10 || normalizedDiff > 350;
+  const normalizedDiff = magnetometerAvailable ? ((heading - qiblaDirection) % 360 + 360) % 360 : 0;
+  const isPointingToQibla = magnetometerAvailable && (normalizedDiff < 10 || normalizedDiff > 350);
 
-  if (errorMsg) {
+  // Show error only for location issues, not magnetometer
+  if (errorMsg && !location) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Ionicons name="warning" size={48} color={COLORS.warning} />
           <Text style={styles.errorText}>{errorMsg}</Text>
           <Text style={styles.errorSubtext}>
-            Please enable location services and try again
+            Please enable location services to calculate Qibla direction
           </Text>
         </View>
       </SafeAreaView>
@@ -166,7 +219,19 @@ export function QiblaSection() {
               color={isPointingToQibla ? '#10B981' : COLORS.textSecondary}
             />
             <Text style={[styles.statusText, isPointingToQibla && styles.statusTextActive]}>
-              {isPointingToQibla ? 'أنت تواجه القبلة ✓' : 'أدر هاتفك حتى يشير السهم للأعلى'}
+              {!magnetometerAvailable 
+                ? `اتجاه القبلة: ${Math.round(qiblaDirection)}°`
+                : isPointingToQibla 
+                  ? 'أنت تواجه القبلة ✓' 
+                  : 'أدر هاتفك حتى يشير السهم للأعلى'}
+            </Text>
+          </View>
+        )}
+        {!magnetometerAvailable && isCalibrated && (
+          <View style={styles.magnetometerWarning}>
+            <Ionicons name="information-circle-outline" size={16} color={COLORS.textSecondary} />
+            <Text style={styles.magnetometerWarningText}>
+              Compass not available - showing Qibla direction only
             </Text>
           </View>
         )}
@@ -180,7 +245,7 @@ export function QiblaSection() {
             <Ionicons name="caret-up" size={40} color={isPointingToQibla ? '#10B981' : '#C9A962'} />
           </View>
           <Text style={[styles.fixedArrowLabel, isPointingToQibla && styles.fixedArrowLabelActive]}>
-            اتجه هنا
+            {magnetometerAvailable ? 'اتجه هنا' : 'اتجاه القبلة'}
           </Text>
         </View>
 
@@ -258,12 +323,28 @@ export function QiblaSection() {
 
       {/* Instructions */}
       <View style={styles.instructionsContainer}>
-        <Text style={styles.instructionsText}>
-          ضع هاتفك بشكل مسطح وأدره حتى تصل الكعبة 🕋 للأعلى
-        </Text>
-        <Text style={styles.instructionsSubtext}>
-          Hold your phone flat and rotate until the Kaaba reaches the top
-        </Text>
+        {magnetometerAvailable ? (
+          <>
+            <Text style={styles.instructionsText}>
+              ضع هاتفك بشكل مسطح وأدره حتى تصل الكعبة 🕋 للأعلى
+            </Text>
+            <Text style={styles.instructionsSubtext}>
+              Hold your phone flat and rotate until the Kaaba reaches the top
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.instructionsText}>
+              اتجاه القبلة: {Math.round(qiblaDirection)}° من الشمال
+            </Text>
+            <Text style={styles.instructionsSubtext}>
+              Qibla direction: {Math.round(qiblaDirection)}° from North
+            </Text>
+            <Text style={styles.instructionsSubtext}>
+              Use a compass app or physical compass to find North, then face {Math.round(qiblaDirection)}° from North
+            </Text>
+          </>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -547,6 +628,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     opacity: 0.7,
+  },
+  magnetometerWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 6,
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  magnetometerWarningText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
   },
   errorContainer: {
     flex: 1,

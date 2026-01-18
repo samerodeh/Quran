@@ -129,30 +129,79 @@ export function SalahSection() {
     }
   }, [notificationSettings, prayerTimes]);
 
-  // Fetch prayer times
+  // Fetch prayer times with periodic location updates
   useEffect(() => {
-    const fetchPrayerTimes = async () => {
-      try {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setLocation('الشارقة'); // Default
-          setDefaultPrayerTimes();
-          return;
-        }
+    let locationSubscription: Location.LocationSubscription | null = null;
+    let refreshInterval: NodeJS.Timeout | null = null;
 
-        const loc = await Location.getCurrentPositionAsync({});
+    const fetchPrayerTimes = async (loc?: Location.LocationObject) => {
+      try {
+        let currentLocation = loc;
+        
+        if (!currentLocation) {
+          let { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            setLocation('الموقع الحالي'); // Default
+            setDefaultPrayerTimes();
+            return;
+          }
+
+          currentLocation = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+        }
         
         // Reverse geocode to get city name
-        const [address] = await Location.reverseGeocodeAsync({
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-        });
-        
-        setLocation(address?.city || address?.region || 'الشارقة');
+        try {
+          const addresses = await Location.reverseGeocodeAsync({
+            latitude: currentLocation.coords.latitude,
+            longitude: currentLocation.coords.longitude,
+          });
+          
+          if (addresses && addresses.length > 0) {
+            const address = addresses[0];
+            let locationName = '';
+            
+            // Priority: city name first, then district, then region
+            // Try to get the most specific city/location name
+            if (address.city) {
+              locationName = address.city;
+            } else if (address.district) {
+              locationName = address.district;
+            } else if (address.subregion) {
+              locationName = address.subregion;
+            } else if (address.region) {
+              locationName = address.region;
+            } else if (address.name) {
+              locationName = address.name;
+            }
+            
+            // If we have a location name, optionally add country for context
+            if (locationName) {
+              // Only add country if it's different and provides useful context
+              if (address.country && 
+                  address.country !== locationName && 
+                  !locationName.includes(address.country)) {
+                locationName = `${locationName}, ${address.country}`;
+              }
+              setLocation(locationName);
+            } else if (address.country) {
+              // Fallback to country if nothing else is available
+              setLocation(address.country);
+            } else {
+              setLocation('الموقع الحالي');
+            }
+          } else {
+            setLocation('الموقع الحالي');
+          }
+        } catch (geocodeError) {
+          console.error('Error reverse geocoding:', geocodeError);
+          setLocation('الموقع الحالي');
+        }
 
         // Fetch from Aladhan API
         const response = await fetch(
-          `https://api.aladhan.com/v1/timings/${Math.floor(Date.now() / 1000)}?latitude=${loc.coords.latitude}&longitude=${loc.coords.longitude}&method=4`
+          `https://api.aladhan.com/v1/timings/${Math.floor(Date.now() / 1000)}?latitude=${currentLocation.coords.latitude}&longitude=${currentLocation.coords.longitude}&method=4`
         );
         const data = await response.json();
         
@@ -195,7 +244,49 @@ export function SalahSection() {
       setLoading(false);
     };
 
+    // Initial fetch
     fetchPrayerTimes();
+
+    // Watch location changes
+    (async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          locationSubscription = await Location.watchPositionAsync(
+            {
+              accuracy: Location.Accuracy.Balanced,
+              timeInterval: 30000, // Update every 30 seconds
+              distanceInterval: 500, // Or when moved 500m
+            },
+            (newLocation) => {
+              fetchPrayerTimes(newLocation);
+            }
+          );
+        }
+      } catch (error) {
+        console.error('Error setting up location watch:', error);
+      }
+    })();
+
+    // Also refresh every 5 minutes as backup
+    refreshInterval = setInterval(() => {
+      fetchPrayerTimes();
+    }, 5 * 60 * 1000);
+
+    return () => {
+      if (locationSubscription) {
+        try {
+          if (typeof locationSubscription.remove === 'function') {
+            locationSubscription.remove();
+          }
+        } catch (error) {
+          console.error('Error removing location subscription:', error);
+        }
+      }
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
   }, [notificationSettings]);
 
   const findNextPrayer = (times: PrayerTime[]) => {
@@ -399,11 +490,6 @@ export function SalahSection() {
       <TouchableOpacity style={styles.fullWidthButton} onPress={() => setActiveSubTab('forbidden')}>
         <Text style={styles.extraButtonText}>أوقات النهي عن الصلاة</Text>
       </TouchableOpacity>
-
-      {/* Support Message */}
-      <View style={styles.supportMessage}>
-        <Text style={styles.supportText}>👋 لا تنسَ الاشتراك ودعم التطبيق</Text>
-      </View>
 
       <View style={styles.bottomSpacing} />
     </ScrollView>
@@ -724,14 +810,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: COLORS.text,
-  },
-  supportMessage: {
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  supportText: {
-    fontSize: 14,
-    color: COLORS.primary,
   },
   bottomSpacing: {
     height: 100,

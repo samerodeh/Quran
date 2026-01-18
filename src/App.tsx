@@ -4,6 +4,7 @@ import { AudioProvider, useAudio } from './contexts/AudioContext';
 import { DownloadProvider } from './contexts/DownloadContext';
 import { FavoritesProvider } from './contexts/FavoritesContext';
 import { SettingsProvider } from './contexts/SettingsContext';
+import { I18nProvider } from './contexts/I18nContext';
 import { TabNavigation } from './components/TabNavigation';
 import { GlobalAudioPlayer } from './components/GlobalAudioPlayer';
 import { ReadSection } from './screens/ReadSection';
@@ -86,13 +87,15 @@ export default function App() {
   return (
     <ErrorBoundary>
       <SettingsProvider>
-        <FavoritesProvider>
-          <DownloadProvider>
-            <AudioProvider>
-              <AppContent />
-            </AudioProvider>
-          </DownloadProvider>
-        </FavoritesProvider>
+        <I18nProvider>
+          <FavoritesProvider>
+            <DownloadProvider>
+              <AudioProvider>
+                <AppContent />
+              </AudioProvider>
+            </DownloadProvider>
+          </FavoritesProvider>
+        </I18nProvider>
       </SettingsProvider>
     </ErrorBoundary>
   );

@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { FlatList, TouchableOpacity, Text, SafeAreaView, View, StyleSheet, TextInput, ActivityIndicator, Alert } from 'react-native';
+import React, { useEffect } from 'react';
+import { FlatList, TouchableOpacity, Text, SafeAreaView, View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SurahListScreenProps, Surah, COLORS } from '../types';
 
@@ -11,7 +11,6 @@ import { useDownload } from '../contexts/DownloadContext';
 export function SurahListScreen({ reciter, onBack }: SurahListScreenProps) {
   const { currentSurah, currentReciter, playSurah, setIsPlayerExpanded } = useAudio();
   const { isDownloaded, isDownloading, getDownloadProgress, downloadSurah, deleteSurah, getDownloadedCount } = useDownload();
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Auto-expand player when on this screen
   useEffect(() => {
@@ -20,20 +19,6 @@ export function SurahListScreen({ reciter, onBack }: SurahListScreenProps) {
       setIsPlayerExpanded(false);
     };
   }, [setIsPlayerExpanded]);
-
-  // Filter surahs based on search query
-  const filteredSurahs = useMemo(() => {
-    if (!searchQuery.trim()) return surahs;
-    
-    const query = searchQuery.toLowerCase().trim();
-    return surahs.filter((surah) => {
-      if (surah.id.toString() === query) return true;
-      if (surah.name.toLowerCase().includes(query)) return true;
-      if (surah.englishName.toLowerCase().includes(query)) return true;
-      if (surah.arabicName.includes(query)) return true;
-      return false;
-    });
-  }, [searchQuery]);
 
   const handlePlaySurah = (surah: Surah) => {
     playSurah(surah, reciter);
@@ -162,40 +147,12 @@ export function SurahListScreen({ reciter, onBack }: SurahListScreenProps) {
         </View>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchInputWrapper}>
-          <Ionicons name="search" size={18} color={COLORS.textSecondary} style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search surah by name or number..."
-            placeholderTextColor={COLORS.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
-              <Ionicons name="close-circle" size={18} color={COLORS.textSecondary} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
       <FlatList
-        data={filteredSurahs}
+        data={surahs}
         renderItem={renderSurahItem}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="search-outline" size={48} color={COLORS.textSecondary} />
-            <Text style={styles.emptyText}>No surahs found</Text>
-            <Text style={styles.emptySubtext}>Try a different search term</Text>
-          </View>
-        }
       />
     </SafeAreaView>
   );
@@ -244,32 +201,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-  },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: COLORS.secondary,
-  },
-  searchInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingHorizontal: 12,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    height: 44,
-    fontSize: 15,
-    color: COLORS.text,
-  },
-  clearButton: {
-    padding: 4,
   },
   listContent: {
     paddingHorizontal: 16,
@@ -412,20 +343,5 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     marginTop: 2,
     fontWeight: '600',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingTop: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginTop: 4,
   },
 });

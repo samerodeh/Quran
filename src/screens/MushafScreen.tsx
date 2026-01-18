@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { View, TouchableOpacity, Text, SafeAreaView, Image, FlatList, Modal, StyleSheet, Dimensions, TextInput } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { View, TouchableOpacity, Text, SafeAreaView, Image, FlatList, Modal, StyleSheet, Dimensions } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { MushafScreenProps, COLORS, TOTAL_PAGES, Surah } from '../types';
 
@@ -16,26 +16,11 @@ export function MushafScreen({ qiraa, onBack }: MushafScreenProps) {
   const [showNav, setShowNav] = useState(true);
   const [showJuzPicker, setShowJuzPicker] = useState(false);
   const [showSurahPicker, setShowSurahPicker] = useState(false);
-  const [surahSearchQuery, setSurahSearchQuery] = useState('');
   const flatListRef = useRef<FlatList>(null);
   
   const { showMiniPlayer } = useAudio();
 
   const pageNumbers = Array.from({ length: TOTAL_PAGES }, (_, i) => i + 1);
-
-  // Filter surahs based on search query
-  const filteredSurahs = useMemo(() => {
-    if (!surahSearchQuery.trim()) return surahs;
-    
-    const query = surahSearchQuery.toLowerCase().trim();
-    return surahs.filter((surah) => {
-      if (surah.id.toString() === query) return true;
-      if (surah.name.toLowerCase().includes(query)) return true;
-      if (surah.englishName.toLowerCase().includes(query)) return true;
-      if (surah.arabicName.includes(query)) return true;
-      return false;
-    });
-  }, [surahSearchQuery]);
 
   const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
@@ -50,7 +35,6 @@ export function MushafScreen({ qiraa, onBack }: MushafScreenProps) {
       flatListRef.current?.scrollToIndex({ index: pageNum - 1, animated: false });
       setShowJuzPicker(false);
       setShowSurahPicker(false);
-      setSurahSearchQuery('');
     }
   };
 
@@ -227,58 +211,27 @@ export function MushafScreen({ qiraa, onBack }: MushafScreenProps) {
         </View>
       </Modal>
 
-      {/* Surah Picker Modal with Search */}
+      {/* Surah Picker Modal */}
       <Modal
         visible={showSurahPicker}
         transparent
         animationType="slide"
-        onRequestClose={() => {
-          setShowSurahPicker(false);
-          setSurahSearchQuery('');
-        }}
+        onRequestClose={() => setShowSurahPicker(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.pickerModal}>
             <View style={styles.pickerHeader}>
               <Text style={styles.pickerTitle}>اختر السورة</Text>
-              <TouchableOpacity onPress={() => {
-                setShowSurahPicker(false);
-                setSurahSearchQuery('');
-              }}>
+              <TouchableOpacity onPress={() => setShowSurahPicker(false)}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
 
-            {/* Search Bar */}
-            <View style={styles.searchContainer}>
-              <Ionicons name="search" size={18} color={COLORS.textSecondary} style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search surah..."
-                placeholderTextColor={COLORS.textSecondary}
-                value={surahSearchQuery}
-                onChangeText={setSurahSearchQuery}
-                autoCorrect={false}
-                autoCapitalize="none"
-              />
-              {surahSearchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSurahSearchQuery('')} style={styles.clearButton}>
-                  <Ionicons name="close-circle" size={18} color={COLORS.textSecondary} />
-                </TouchableOpacity>
-              )}
-            </View>
-
             <FlatList
-              data={filteredSurahs}
+              data={surahs}
               keyExtractor={(item) => item.id.toString()}
               renderItem={renderSurahItem}
               showsVerticalScrollIndicator={false}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="search-outline" size={40} color={COLORS.textSecondary} />
-                  <Text style={styles.emptyText}>No surahs found</Text>
-                </View>
-              }
             />
           </View>
         </View>
@@ -422,26 +375,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.text,
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    height: 44,
-    fontSize: 15,
-    color: COLORS.text,
-  },
-  clearButton: {
-    padding: 4,
-  },
   pickerItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -482,14 +415,5 @@ const styles = StyleSheet.create({
   surahPageNum: {
     fontSize: 12,
     color: COLORS.textSecondary,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingTop: 40,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
-    marginTop: 12,
   },
 });

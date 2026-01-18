@@ -384,12 +384,18 @@ function RepeatModal({
   const [localEndTime, setLocalEndTime] = useState<number>(repeatEndTime ?? playbackPosition + 10000);
   const [localCount, setLocalCount] = useState<string>(repeatCount.toString());
   const [selectedMode, setSelectedMode] = useState<RepeatMode>(repeatMode);
+  const [startTimeInput, setStartTimeInput] = useState<string>('');
+  const [endTimeInput, setEndTimeInput] = useState<string>('');
 
   // Update local state when modal opens or props change
   React.useEffect(() => {
     if (visible) {
-      setLocalStartTime(repeatStartTime ?? playbackPosition);
-      setLocalEndTime(repeatEndTime ?? Math.min(playbackPosition + 10000, playbackDuration));
+      const start = repeatStartTime ?? playbackPosition;
+      const end = repeatEndTime ?? Math.min(playbackPosition + 10000, playbackDuration);
+      setLocalStartTime(start);
+      setLocalEndTime(end);
+      setStartTimeInput(formatTime(start));
+      setEndTimeInput(formatTime(end));
       setLocalCount(repeatCount.toString());
       setSelectedMode(repeatMode);
     }
@@ -403,20 +409,99 @@ function RepeatModal({
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  // Format time input as user types (auto-add colon)
+  const formatTimeInput = (text: string): string => {
+    // Remove any non-digit characters
+    const digits = text.replace(/\D/g, '');
+    
+    if (digits.length === 0) return '';
+    if (digits.length <= 2) return digits;
+    
+    // Format as M:SS or MM:SS
+    const minutes = digits.slice(0, -2);
+    const seconds = digits.slice(-2);
+    return `${minutes}:${seconds}`;
+  };
+
+  // Parse time string (MM:SS or M:SS) to milliseconds
+  const parseTimeString = (timeStr: string): number | null => {
+    if (!timeStr || !timeStr.trim()) return null;
+    
+    // Remove any whitespace
+    const cleaned = timeStr.trim();
+    
+    // Match format: M:SS or MM:SS
+    const match = cleaned.match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) {
+      // Try to parse as just digits (e.g., "125" = 1:25)
+      const digits = cleaned.replace(/\D/g, '');
+      if (digits.length >= 2) {
+        const minutes = parseInt(digits.slice(0, -2) || '0', 10);
+        const seconds = parseInt(digits.slice(-2), 10);
+        if (!isNaN(minutes) && !isNaN(seconds) && seconds < 60) {
+          return (minutes * 60 + seconds) * 1000;
+        }
+      }
+      return null;
+    }
+    
+    const minutes = parseInt(match[1], 10);
+    const seconds = parseInt(match[2], 10);
+    
+    if (isNaN(minutes) || isNaN(seconds) || seconds >= 60) return null;
+    
+    return (minutes * 60 + seconds) * 1000;
+  };
+
+  const handleStartTimeChange = (text: string) => {
+    const formatted = formatTimeInput(text);
+    setStartTimeInput(formatted);
+    
+    const parsed = parseTimeString(formatted);
+    if (parsed !== null) {
+      const clamped = Math.max(0, Math.min(parsed, playbackDuration));
+      setLocalStartTime(clamped);
+    }
+  };
+
+  const handleEndTimeChange = (text: string) => {
+    const formatted = formatTimeInput(text);
+    setEndTimeInput(formatted);
+    
+    const parsed = parseTimeString(formatted);
+    if (parsed !== null) {
+      const clamped = Math.max(0, Math.min(parsed, playbackDuration));
+      setLocalEndTime(clamped);
+    }
+  };
+
   const handleSetStart = () => {
     const clamped = Math.max(0, Math.min(playbackPosition, playbackDuration));
     setLocalStartTime(clamped);
+    setStartTimeInput(formatTime(clamped));
   };
 
   const handleSetEnd = () => {
     const clamped = Math.max(0, Math.min(playbackPosition, playbackDuration));
     setLocalEndTime(clamped);
+    setEndTimeInput(formatTime(clamped));
   };
 
   const handleApply = () => {
-    // Clamp values to valid range
-    const start = Math.max(0, Math.min(Math.min(localStartTime, localEndTime), playbackDuration));
-    const end = Math.max(0, Math.min(Math.max(localStartTime, localEndTime), playbackDuration));
+    // Parse input times if they were manually entered
+    let start = localStartTime;
+    let end = localEndTime;
+    
+    // Try to parse from input strings if they exist
+    const parsedStart = parseTimeString(startTimeInput);
+    const parsedEnd = parseTimeString(endTimeInput);
+    
+    if (parsedStart !== null) {
+      start = Math.max(0, Math.min(parsedStart, playbackDuration));
+    }
+    if (parsedEnd !== null) {
+      end = Math.max(0, Math.min(parsedEnd, playbackDuration));
+    }
     
     // Ensure start < end
     if (start >= end) {
@@ -451,12 +536,17 @@ function RepeatModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <TouchableOpacity
-        style={styles.repeatModalOverlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View style={styles.repeatModalContainer} onStartShouldSetResponder={() => true}>
+      <View style={styles.repeatModalOverlay}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View 
+          style={styles.repeatModalContainer}
+          pointerEvents="box-none"
+        >
+          <View pointerEvents="auto">
           <Text style={styles.repeatModalTitle}>تكرار</Text>
           <Text style={styles.repeatModalSubtitle}>Repeat Section</Text>
 
@@ -466,6 +556,15 @@ function RepeatModal({
             <View style={styles.repeatTimeRow}>
               <View style={styles.repeatTimeControl}>
                 <Text style={styles.repeatTimeLabel}>Start</Text>
+                <TextInput
+                  style={styles.repeatTimeInput}
+                  value={startTimeInput}
+                  onChangeText={handleStartTimeChange}
+                  placeholder="M:SS"
+                  placeholderTextColor={COLORS.textSecondary}
+                  keyboardType="default"
+                  maxLength={5}
+                />
                 <Text style={styles.repeatTimeValue}>{formatTime(localStartTime)}</Text>
                 <TouchableOpacity style={styles.repeatSetButton} onPress={handleSetStart}>
                   <Text style={styles.repeatSetButtonText}>Set to Current</Text>
@@ -473,6 +572,15 @@ function RepeatModal({
               </View>
               <View style={styles.repeatTimeControl}>
                 <Text style={styles.repeatTimeLabel}>End</Text>
+                <TextInput
+                  style={styles.repeatTimeInput}
+                  value={endTimeInput}
+                  onChangeText={handleEndTimeChange}
+                  placeholder="M:SS"
+                  placeholderTextColor={COLORS.textSecondary}
+                  keyboardType="default"
+                  maxLength={5}
+                />
                 <Text style={styles.repeatTimeValue}>{formatTime(localEndTime)}</Text>
                 <TouchableOpacity style={styles.repeatSetButton} onPress={handleSetEnd}>
                   <Text style={styles.repeatSetButtonText}>Set to Current</Text>
@@ -539,8 +647,9 @@ function RepeatModal({
               <Text style={styles.repeatApplyButtonText}>Apply</Text>
             </TouchableOpacity>
           </View>
+          </View>
         </View>
-      </TouchableOpacity>
+      </View>
     </Modal>
   );
 }
@@ -923,10 +1032,22 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginBottom: 4,
   },
-  repeatTimeValue: {
-    fontSize: 18,
+  repeatTimeInput: {
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 16,
     fontWeight: '600',
     color: COLORS.text,
+    textAlign: 'center',
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  repeatTimeValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.textSecondary,
     marginBottom: 8,
   },
   repeatSetButton: {

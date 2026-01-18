@@ -89,14 +89,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, [updateSettings]);
 
   const setDisplayLanguage = useCallback(async (language: LanguageCode) => {
-    // Only allow switching between Arabic and other languages (not English as primary)
-    // English is always secondary
-    if (language === 'en') {
-      // If user selects English, set display to Arabic (since English is always secondary)
-      await updateSettings({ displayLanguage: 'ar' });
-    } else {
-      await updateSettings({ displayLanguage: language });
-    }
+    // Allow user to select any language
+    await updateSettings({ displayLanguage: language });
   }, [updateSettings]);
 
   const value: SettingsContextState = {

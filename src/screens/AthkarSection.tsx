@@ -1,166 +1,301 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   SafeAreaView,
   Dimensions,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../types';
+import { morningAthkar, eveningAthkar, AthkarItem } from '../data/athkar';
 
+const { width, height } = Dimensions.get('window');
 
-
-const { width } = Dimensions.get('window');
-
-interface AthkarCategory {
-  id: string;
-  arabicName: string;
-  color?: string;
-  locked?: boolean;
-}
-
-interface AthkarButton {
-  id: string;
-  arabicName: string;
-  color: string;
-}
-
-const mainButtons: AthkarButton[] = [
-  { id: 'quran_duas', arabicName: 'أدعية من القرآن', color: COLORS.textSecondary },
-  { id: 'prophet_duas', arabicName: 'من دعاء الرسول ﷺ', color: '#F59E0B' },
-  { id: 'ruqyah_quran', arabicName: 'الرقية بالقرآن', color: '#10B981' },
-  { id: 'ruqyah_sunnah', arabicName: 'الرقية بالسنة', color: COLORS.textSecondary },
-  { id: 'tasabeeh', arabicName: 'تسابيح', color: '#3B82F6' },
-  { id: 'more', arabicName: 'المزيد', color: '#10B981' },
-];
-
-const categories: AthkarCategory[] = [
-  { id: 'loved_ones', arabicName: 'أذكار الأحبة', locked: true },
-  { id: 'history', arabicName: 'التاريخ', locked: true },
-  { id: 'friday', arabicName: 'الجمعة', locked: false },
-  { id: 'kids', arabicName: 'أذكار للصغار', locked: true },
-  { id: 'umrah', arabicName: 'العمرة', locked: true },
-  { id: 'hajj', arabicName: 'الحج', locked: true },
-  { id: 'athkar_card', arabicName: 'بطاقة الأذكار', locked: true },
-  { id: 'athkar_book', arabicName: 'كتيب الأذكار', locked: true },
-];
-
-const topTabs = ['المنوعة', 'الصلاة', 'القبلة', 'المفضلة', 'العداد'];
 
 export function AthkarSection() {
-  const [activeTopTab, setActiveTopTab] = useState('المنوعة');
+  const [activeTab, setActiveTab] = useState<'morning' | 'evening'>('morning');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [morningCounts, setMorningCounts] = useState<Record<string, number>>({});
+  const [eveningCounts, setEveningCounts] = useState<Record<string, number>>({});
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const currentItems = activeTab === 'morning' 
+    ? morningAthkar[0].items 
+    : eveningAthkar[0].items;
+
+  const currentItem = currentItems[currentIndex];
+  const currentCounts = activeTab === 'morning' ? morningCounts : eveningCounts;
+  const currentCount = currentCounts[currentItem?.id] || 0;
+
+  const handleCountChange = (id: string, count: number, type: 'morning' | 'evening') => {
+    if (type === 'morning') {
+      setMorningCounts((prev) => ({ ...prev, [id]: count }));
+    } else {
+      setEveningCounts((prev) => ({ ...prev, [id]: count }));
+    }
+  };
+
+  const goToNext = () => {
+    if (currentIndex < currentItems.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    }
+  };
+
+  const goToPrevious = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+    }
+  };
+
+  const handleIncrement = (itemId?: string) => {
+    // Use provided itemId or fall back to current item
+    const targetItem = itemId 
+      ? currentItems.find(item => item.id === itemId) 
+      : currentItem;
+    
+    if (!targetItem) return;
+    
+    const targetCounts = activeTab === 'morning' ? morningCounts : eveningCounts;
+    const targetCount = targetCounts[targetItem.id] || 0;
+    
+    if (targetCount < targetItem.count) {
+      const newCount = targetCount + 1;
+      handleCountChange(targetItem.id, newCount, activeTab);
+      
+      // Auto-advance to next page when goal is reached
+      if (newCount >= targetItem.count) {
+        const itemIndex = currentItems.findIndex(item => item.id === targetItem.id);
+        if (itemIndex >= 0 && itemIndex < currentItems.length - 1) {
+          setTimeout(() => {
+            setCurrentIndex(itemIndex + 1);
+          }, 300); // Small delay for visual feedback
+        }
+      }
+    }
+  };
+
+  const handleReset = () => {
+    handleCountChange(currentItem.id, 0, activeTab);
+  };
+
+  // Handle scroll to update current index
+  const handleScroll = (event: any) => {
+    const scrollPosition = event.nativeEvent.contentOffset.x;
+    const index = Math.round(scrollPosition / width);
+    if (index !== currentIndex && index >= 0 && index < currentItems.length) {
+      setCurrentIndex(index);
+    }
+  };
+
+  // Scroll to current index when it changes
+  useEffect(() => {
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({
+        x: currentIndex * width,
+        animated: true,
+      });
+    }
+  }, [currentIndex]);
+
+  const getCountText = () => {
+    const counts: { [key: number]: string } = {
+      1: 'مرة واحدة',
+      3: 'ثلاث مرات',
+      4: 'أربع مرات',
+      7: 'سبع مرات',
+      100: 'مئة مرة',
+    };
+    return counts[currentItem?.count] || `${currentItem?.count} مرة`;
+  };
+
+  // Reset index when switching tabs
+  const handleTabChange = (tab: 'morning' | 'evening') => {
+    setActiveTab(tab);
+    setCurrentIndex(0);
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({
+        x: 0,
+        animated: false,
+      });
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerIcon}>
-          <Ionicons name="play" size={24} color={COLORS.text} />
+        <TouchableOpacity style={styles.menuButton}>
+          <Ionicons name="menu" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>أَذْكَار</Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.headerIcon}>
-            <Ionicons name="bookmark-outline" size={22} color={COLORS.text} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerIcon}>
-            <Ionicons name="search" size={22} color={COLORS.text} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerIcon}>
-            <Ionicons name="settings-outline" size={22} color={COLORS.text} />
-          </TouchableOpacity>
-        </View>
+        
+        <Text style={styles.headerTitle}>
+          {activeTab === 'morning' ? 'أذكار الصباح' : 'أذكار المساء'}
+        </Text>
+
+        <TouchableOpacity 
+          style={styles.nextButton} 
+          onPress={goToNext}
+          disabled={currentIndex >= currentItems.length - 1}
+        >
+          <Ionicons 
+            name="chevron-forward" 
+            size={24} 
+            color={currentIndex >= currentItems.length - 1 ? COLORS.border : COLORS.text} 
+          />
+        </TouchableOpacity>
       </View>
 
-      {/* Top Tabs */}
-      <View style={styles.topTabsContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topTabs}>
-          {topTabs.map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.topTab, activeTopTab === tab && styles.topTabActive]}
-              onPress={() => setActiveTopTab(tab)}
-            >
-              <Text style={[styles.topTabText, activeTopTab === tab && styles.topTabTextActive]}>
-                {tab}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Main Buttons Grid */}
-        <View style={styles.mainButtonsGrid}>
-          {mainButtons.map((button, index) => (
-            <TouchableOpacity
-              key={button.id}
-              style={[
-                styles.mainButton,
-                index % 2 === 0 ? styles.mainButtonLeft : styles.mainButtonRight,
-              ]}
-            >
-              <Text style={[styles.mainButtonText, { color: button.color }]}>
-                {button.arabicName}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Comprehensive Duas Section */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionSubtitle}>يوم الجمعة</Text>
-            <Text style={styles.sectionTitle}>أدعية شاملة</Text>
-          </View>
-        </View>
-
-        {/* Categories Grid */}
-        <View style={styles.categoriesGrid}>
-          {categories.map((category, index) => (
-            <TouchableOpacity
-              key={category.id}
-              style={[
-                styles.categoryButton,
-                index % 2 === 0 ? styles.categoryButtonLeft : styles.categoryButtonRight,
-              ]}
-            >
-              <Text style={styles.categoryText}>{category.arabicName}</Text>
-              {category.locked && (
-                <View style={styles.lockIcon}>
-                  <Ionicons name="lock-closed" size={14} color={COLORS.textSecondary} />
-                </View>
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Dua Etiquette */}
-        <TouchableOpacity style={styles.etiquetteCard}>
-          <Text style={styles.etiquetteText}>آداب الدعاء</Text>
-        </TouchableOpacity>
-
-        {/* Salawat Section */}
-        <View style={styles.salawatCard}>
-          <View style={styles.salawatHeader}>
-            <TouchableOpacity style={styles.moreButton}>
-              <Text style={styles.moreButtonText}>...</Text>
-            </TouchableOpacity>
-            <View style={styles.salawatTitleContainer}>
-              <Text style={styles.salawatTitle}>أكثروا من الصلاة على النبي</Text>
-              <Text style={styles.salawatEmoji}> ﷺ</Text>
-            </View>
-          </View>
-          <Text style={styles.salawatText}>
-            اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ، وَعَلَى آلِ مُحَمَّدٍ، كَمَا صَلَّيْتَ عَلَى إِبْرَاهِيمَ، وَعَلَى آلِ إِبْرَاهِيمَ، إِنَّكَ حَمِيدٌ مَجِيدٌ، وَبَارِكْ عَلَى مُحَمَّدٍ، وَعَلَى آلِ مُحَمَّدٍ، كَمَا بَارَكْتَ عَلَى إِبْرَاهِيمَ، وَعَلَى آلِ إِبْرَاهِيمَ، إِنَّكَ حَمِيدٌ مَجِيدٌ
+      {/* Tab Selector Below Header */}
+      <View style={styles.tabSelectorContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'morning' && styles.tabActive]}
+          onPress={() => handleTabChange('morning')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'morning' && styles.tabTextActive,
+            ]}
+          >
+            أذكار الصباح
           </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'evening' && styles.tabActive]}
+          onPress={() => handleTabChange('evening')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'evening' && styles.tabTextActive,
+            ]}
+          >
+            أذكار المساء
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Swipeable Content Area */}
+      <ScrollView
+        ref={scrollViewRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleScroll}
+        style={styles.horizontalScrollView}
+        scrollEnabled={true}
+      >
+        {currentItems.map((item, index) => {
+          const itemCounts = activeTab === 'morning' ? morningCounts : eveningCounts;
+          const itemCount = itemCounts[item.id] || 0;
+          
+          return (
+            <View key={item.id} style={styles.pageContainer}>
+              <Pressable
+                style={styles.contentArea}
+                onPress={() => handleIncrement(item.id)}
+                android_ripple={{ color: 'rgba(255, 255, 255, 0.1)' }}
+              >
+                <ScrollView 
+                  style={styles.content}
+                  contentContainerStyle={styles.contentContainer}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {(item.id === 'm1' || item.id === 'm2' || item.id === 'e1' || item.id === 'e2' || 
+                    item.id === 'e2b' || item.id === 'e2c' || item.id === 'e2d') ? (
+                    <Text style={styles.bismillah}>
+                      {item.id === 'm1' || item.id === 'e1' 
+                        ? 'أَعُوذُ بِاللهِ مِنْ الشَّيْطَانِ الرَّجِيمِ'
+                        : item.id === 'e2b' || item.id === 'e2c' || item.id === 'e2d'
+                        ? 'بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ'
+                        : 'بِسْمِ اللهِ الرَّحْمَنِ الرَّحِيمِ'}
+                    </Text>
+                  ) : null}
+
+                  {/* Main Arabic Text */}
+                  <Text style={styles.athkarArabic}>{item.arabic}</Text>
+
+                  {/* Virtue/Benefit Text */}
+                  {item.virtue && (
+                    <Text style={styles.athkarVirtue}>{item.virtue}</Text>
+                  )}
+
+                  {/* Reference */}
+                  {item.reference && (
+                    <Text style={styles.athkarReference}>
+                      {item.reference.includes('/') 
+                        ? `(${item.reference})` 
+                        : `(رواه ${item.reference})`}
+                    </Text>
+                  )}
+
+                  {/* Separator Line */}
+                  <View style={styles.separator} />
+
+                  {/* Repetition Instruction */}
+                  <Text style={styles.repetitionText}>
+                    {(() => {
+                      const counts: { [key: number]: string } = {
+                        1: 'مرة واحدة',
+                        3: 'ثلاث مرات',
+                        4: 'أربع مرات',
+                        7: 'سبع مرات',
+                        10: 'عشر مرات',
+                        100: 'مئة مرة',
+                      };
+                      return counts[item.count] || `${item.count} مرة`;
+                    })()}
+                  </Text>
+                </ScrollView>
+              </Pressable>
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {/* Bottom Control Bar */}
+      <View style={styles.bottomBar}>
+        <View style={styles.bottomLeft}>
+          <Text style={styles.itemCounter}>
+            {currentItems.length}/{currentIndex + 1}
+          </Text>
+          <TouchableOpacity style={styles.starButton}>
+            <Ionicons name="star-outline" size={22} color={COLORS.textSecondary} />
+          </TouchableOpacity>
         </View>
 
-        {/* Bottom Spacing */}
-        <View style={styles.bottomSpacing} />
-      </ScrollView>
+        <View style={styles.bottomCenter}>
+          <TouchableOpacity 
+            style={[styles.countCircle, currentCount >= currentItem?.count && styles.countCircleComplete]}
+            onPress={() => handleIncrement()}
+            disabled={currentCount >= currentItem?.count}
+          >
+            <Text style={[styles.countCircleText, currentCount >= currentItem?.count && styles.countCircleTextComplete]}>
+              {currentCount >= currentItem?.count ? currentItem?.count : currentCount}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.speedText}>1x</Text>
+          <TouchableOpacity style={styles.playButton}>
+            <Ionicons name="play" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={styles.shareButton}>
+          <Ionicons name="share-outline" size={22} color={COLORS.textSecondary} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Progress Indicator */}
+      <View style={styles.progressIndicator}>
+        <Text style={styles.progressText}>
+          {currentIndex + 1} of {currentItems.length}
+        </Text>
+      </View>
     </SafeAreaView>
   );
 }
@@ -176,191 +311,189 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: 50,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#C9A962',
-    fontFamily: 'System',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  headerIcon: {
-    padding: 4,
-  },
-  topTabsContainer: {
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  topTabs: {
+  menuButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    flex: 1,
+    textAlign: 'center',
+  },
+  tabSelectorContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 8,
-  },
-  topTab: {
+    backgroundColor: COLORS.surface,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    gap: 16,
   },
-  topTabActive: {
+  tab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  tabActive: {
     borderBottomWidth: 2,
     borderBottomColor: COLORS.primary,
   },
-  topTabText: {
-    fontSize: 14,
+  tabText: {
+    fontSize: 16,
     color: COLORS.textSecondary,
+    fontWeight: '500',
   },
-  topTabTextActive: {
+  tabTextActive: {
     color: COLORS.text,
     fontWeight: '600',
+  },
+  nextButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  horizontalScrollView: {
+    flex: 1,
+  },
+  pageContainer: {
+    width: width,
+    flex: 1,
+  },
+  contentArea: {
+    flex: 1,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
   },
-  mainButtonsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 16,
+  contentContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 120,
   },
-  mainButton: {
-    width: (width - 48) / 2,
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    alignItems: 'center',
-  },
-  mainButtonLeft: {
-    marginRight: 6,
-  },
-  mainButtonRight: {
-    marginLeft: 6,
-  },
-  mainButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  sectionCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sectionTitle: {
+  bismillah: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  },
-  categoriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  categoryButton: {
-    width: (width - 48) / 2,
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryButtonLeft: {
-    marginRight: 6,
-  },
-  categoryButtonRight: {
-    marginLeft: 6,
-  },
-  categoryText: {
-    fontSize: 14,
-    color: COLORS.text,
-    fontWeight: '500',
-  },
-  lockIcon: {
-    marginLeft: 8,
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: 10,
-    padding: 4,
-  },
-  etiquetteCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    alignItems: 'center',
-  },
-  etiquetteText: {
-    fontSize: 16,
-    color: COLORS.text,
-    fontWeight: '500',
-  },
-  salawatCard: {
-    backgroundColor: '#1A3A4A',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  salawatHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  salawatTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  salawatTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#10B981',
-  },
-  salawatEmoji: {
-    fontSize: 16,
-    color: '#C9A962',
-  },
-  moreButton: {
-    padding: 4,
-  },
-  moreButtonText: {
-    fontSize: 20,
-    color: COLORS.textSecondary,
-  },
-  salawatText: {
-    fontSize: 18,
-    color: COLORS.text,
-    lineHeight: 32,
+    color: '#60A5FA', // Light blue color
     textAlign: 'right',
+    marginBottom: 20,
+    lineHeight: 32,
+  },
+  athkarArabic: {
+    fontSize: 24,
+    color: COLORS.text,
+    textAlign: 'right',
+    lineHeight: 42,
+    marginBottom: 16,
     fontFamily: 'System',
   },
-  bottomSpacing: {
-    height: 100,
+  athkarVirtue: {
+    fontSize: 15,
+    color: '#60A5FA', // Light blue color
+    textAlign: 'right',
+    lineHeight: 26,
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  athkarReference: {
+    fontSize: 14,
+    color: '#60A5FA', // Light blue color
+    textAlign: 'right',
+    marginBottom: 20,
+    fontStyle: 'italic',
+  },
+  separator: {
+    width: '100%',
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginBottom: 20,
+  },
+  repetitionText: {
+    fontSize: 16,
+    color: COLORS.text,
+    textAlign: 'right',
+  },
+  bottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  bottomLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  itemCounter: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  starButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bottomCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  countCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.border,
+  },
+  countCircleComplete: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  countCircleText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.text,
+  },
+  countCircleTextComplete: {
+    color: COLORS.secondary,
+  },
+  speedText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  playButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shareButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressIndicator: {
+    alignItems: 'center',
+    paddingBottom: 8,
+    backgroundColor: COLORS.surface,
+  },
+  progressText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
   },
 });
-
